@@ -4,10 +4,14 @@ const authRoutes = require('./authRoutes');
 const roleRoutes = require('./roleRoutes');
 const branchRoutes = require('./branchRoutes');
 const userRoutes = require('./userRoutes');
+const vehicleRoutes = require('./vehicleRoutes');
+const bookingRoutes = require('./bookingRoutes');
 
 router.use('/auth', authRoutes);
 router.use('/roles', roleRoutes);
 router.use('/branches', branchRoutes);
 router.use('/users', userRoutes);
+router.use('/vehicle', vehicleRoutes);
+router.use('/bookings', bookingRoutes);
 
 module.exports = router;

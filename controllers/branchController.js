@@ -3,14 +3,9 @@ const Branch = require('../models/Branch');
 // Create Branch
 exports.createBranch = async (req, res) => {
   try {
-    const { branchId, name, address, phone, manager, status } = req.body;
+    const { name, address, phone, manager, status } = req.body;
 
-    const existing = await Branch.findOne({ branchId });
-    if (existing) {
-      return res.status(400).json({ message: 'Branch ID already exists' });
-    }
-
-    const branch = new Branch({ branchId, name, address, phone, manager, status });
+    const branch = new Branch({ name, address, phone, manager,  status: status.toLowerCase(), });
     await branch.save();
 
     res.status(201).json(branch);
@@ -24,12 +19,18 @@ exports.createBranch = async (req, res) => {
 exports.getBranches = async (req, res) => {
   try {
     const branches = await Branch.find();
-    res.status(200).json(branches);
+    const total = await Branch.countDocuments();
+
+    res.status(200).json({
+      data: branches,
+      total,
+    });
   } catch (error) {
     console.error('GET_BRANCHES_ERROR:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
 
 // Get branch by ID
 exports.getBranchById = async (req, res) => {
@@ -46,11 +47,11 @@ exports.getBranchById = async (req, res) => {
 // Update branch
 exports.updateBranch = async (req, res) => {
   try {
-    const { branchId, name, address, phone, manager, status } = req.body;
+    const { name, address, phone, manager, status } = req.body;
 
     const branch = await Branch.findByIdAndUpdate(
       req.params.id,
-      { branchId, name, address, phone, manager, status },
+      { name, address, phone, manager, status },
       { new: true }
     );
 
@@ -72,5 +73,38 @@ exports.deleteBranch = async (req, res) => {
   } catch (error) {
     console.error('DELETE_BRANCH_ERROR:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+
+// Search branches with pagination and name query
+exports.searchBranches = async (req, res) => {
+  try {
+    const { query = "", limit = 10, page = 1 } = req.body;
+
+    // Build case-insensitive regex search for the name field
+    const searchCondition = {
+      name: { $regex: query, $options: "i" },
+    };
+
+    const skip = (page - 1) * limit;
+
+    const total = await Branch.countDocuments(searchCondition);
+
+    const branches = await Branch.find(searchCondition)
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      data: branches,
+    });
+  } catch (error) {
+    console.error("SEARCH_BRANCHES_ERROR:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
