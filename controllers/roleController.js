@@ -6,14 +6,26 @@ const Permission = require('../models/Permission');
 // Create a new role
 exports.createRole = async (req, res) => {
     try {
-        const { rolecode, rolename, description, permissions } = req.body;
+        const { rolename, description, permissions } = req.body;
 
-        const existing = await Role.findOne({ rolecode });
-        if (existing) {
-            return res.status(400).json({ message: 'Role code already exists' });
+        if (!rolename || !description) {
+            return res.status(400).json({ message: 'Rolename and description are required' });
         }
 
-        const role = new Role({ rolecode, rolename, description, permissions });
+        // Step 1: Get the highest existing rolecode
+        const lastRole = await Role.findOne({})
+            .sort({ rolecode: -1 }) 
+            .collation({ locale: "en", numericOrdering: true }); 
+
+        // Step 2: Determine the next code
+        let nextCode = '0001'; // default for the first role
+        if (lastRole && lastRole.rolecode) {
+            const numericCode = parseInt(lastRole.rolecode, 10) + 1;
+            nextCode = numericCode.toString().padStart(4, '0'); 
+        }
+
+        // Step 3: Save new role with auto-generated rolecode
+        const role = new Role({ rolecode: nextCode, rolename, description, permissions });
         await role.save();
 
         res.status(201).json({ message: 'Role created successfully', role });
@@ -22,6 +34,7 @@ exports.createRole = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
 
 // Get all roles
 exports.getRoles = async (req, res) => {

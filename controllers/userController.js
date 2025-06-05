@@ -100,3 +100,27 @@ exports.deleteUser = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+exports.searchUsers = async (req, res) => {
+  try {
+    const { query = "", page = 1, limit = 10 } = req.body;
+    const regex = new RegExp(query, "i"); 
+    const skip = (page - 1) * limit;
+
+    const total = await User.countDocuments({ fullName: regex });
+    const users = await User.find({ fullName: regex })
+      .populate("role")
+      .skip(skip)
+      .limit(Number(limit));
+
+    res.json({
+      data: users,
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
