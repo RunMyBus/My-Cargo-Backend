@@ -1,11 +1,9 @@
-const Booking = require('../models/Booking');
+const BookingService = require('../services/BookingService');
 
 // Create booking
 exports.createBooking = async (req, res) => {
   try {
-    // status will default to 'pending' automatically from schema
-    const booking = new Booking(req.body);
-    await booking.save();
+    const booking = await BookingService.createBooking(req.body, req.user._id);
     res.status(201).json(booking);
   } catch (error) {
     res.status(400).json({ error: error.message });
