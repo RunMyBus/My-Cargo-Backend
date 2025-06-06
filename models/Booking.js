@@ -10,8 +10,8 @@ const bookingSchema = new mongoose.Schema({
   receiverPhone:  {type:String, required: true},
   receiverEmail: String,
   receiverAddress: String,
-  fromOffice: String,
-  toOffice: String,
+  fromOffice: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
+  toOffice: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
   packageDescription: String,
   weight: String,
   dimensions: String,
@@ -23,27 +23,47 @@ const bookingSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['Paid', 'ToPay'],
+    enum: ['Paid', 'UnPaid'],
     default: 'Paid',
     required: true
   },
 }, { timestamps: true });
 
-// Pre-save hook to generate bookingId like B001, B002 ...
 bookingSchema.pre('save', async function(next) {
   if (this.isNew) {
-    // Get last bookingId in DB
-    const lastBooking = await this.constructor.findOne().sort({ createdAt: -1 }).exec();
-    if (!lastBooking || !lastBooking.bookingId) {
-      this.bookingId = 'B001';
-    } else {
-      const lastIdNum = parseInt(lastBooking.bookingId.slice(1)); 
-      const newIdNum = lastIdNum + 1;
-      this.bookingId = 'B' + newIdNum.toString().padStart(3, '0');
+    const typeLetter = this.type ? this.type.charAt(0).toUpperCase() : 'X'; // fallback 'X'
+
+    // Format date + time: YYYYMMDDHHMMSS
+    const now = new Date();
+    const pad = (num, size = 2) => num.toString().padStart(size, '0');
+    const dateTimeString =
+      now.getFullYear().toString() +
+      pad(now.getMonth() + 1) +
+      pad(now.getDate()) +
+      pad(now.getHours()) +
+      pad(now.getMinutes()) +
+      pad(now.getSeconds());
+
+    // Find last booking with same prefix to get sequence number
+    const regex = new RegExp(`^${typeLetter}${dateTimeString}(\\d{3})$`);
+    const lastBooking = await this.constructor.findOne({ bookingId: { $regex: regex } })
+      .sort({ bookingId: -1 })
+      .exec();
+
+    let sequenceNumber = 1;
+    if (lastBooking && lastBooking.bookingId) {
+      const lastSeqStr = lastBooking.bookingId.slice(-3);
+      const lastSeqNum = parseInt(lastSeqStr, 10);
+      sequenceNumber = lastSeqNum + 1;
     }
+
+    const seqString = sequenceNumber.toString().padStart(3, '0');
+
+    this.bookingId = `${typeLetter}${dateTimeString}${seqString}`;
   }
   next();
 });
+
 
 const Booking = mongoose.model('Booking', bookingSchema);
 module.exports = Booking;
