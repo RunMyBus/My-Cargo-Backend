@@ -3,11 +3,11 @@ const mongoose = require('mongoose');
 const bookingSchema = new mongoose.Schema({
   bookingId: { type: String, unique: true },
   senderName: String,
-  senderPhone: String,
+  senderPhone: {type:String, required: true},
   senderEmail: String,
   senderAddress: String,
   receiverName: String,
-  receiverPhone: String,
+  receiverPhone:  {type:String, required: true},
   receiverEmail: String,
   receiverAddress: String,
   fromOffice: String,
@@ -18,8 +18,14 @@ const bookingSchema = new mongoose.Schema({
   assignedVehicle: String,
   status: {
     type: String,
-    enum: ['Pending', 'In Transit', 'Cancelled', 'Delivered'], 
-    default: 'Pending',
+    enum: ['Booked', 'InTransit', 'Cancelled', 'Delivered'],
+    default: 'Booked',
+  },
+  type: {
+    type: String,
+    enum: ['Paid', 'ToPay'],
+    default: 'Paid',
+    required: true
   },
 }, { timestamps: true });
 
