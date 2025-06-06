@@ -1,13 +1,19 @@
-const Branch = require('../models/Branch');
+const Branch = require('../models/Branch'); // adjust path as needed
 
-// Create Branch
+// Create a new branch
 exports.createBranch = async (req, res) => {
   try {
     const { name, address, phone, manager, status } = req.body;
 
-    const branch = new Branch({ name, address, phone, manager,  status: status.toLowerCase(), });
-    await branch.save();
+    const branch = new Branch({
+      name,
+      address,
+      phone,
+      manager,
+      status: status?.toLowerCase() || 'active'
+    });
 
+    await branch.save();
     res.status(201).json(branch);
   } catch (error) {
     console.error('CREATE_BRANCH_ERROR:', error);
@@ -31,12 +37,12 @@ exports.getBranches = async (req, res) => {
   }
 };
 
-
-// Get branch by ID
+// Get a branch by ID
 exports.getBranchById = async (req, res) => {
   try {
     const branch = await Branch.findById(req.params.id);
     if (!branch) return res.status(404).json({ message: 'Branch not found' });
+    
     res.status(200).json(branch);
   } catch (error) {
     console.error('GET_BRANCH_ERROR:', error);
