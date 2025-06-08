@@ -10,10 +10,15 @@ const logsDir = 'logs';
 if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir);
 }
+const timezoned = () => {
+    return new Date().toLocaleString('en-US', {
+        timeZone: 'Asia/Kolkata'
+    });
+}
 const logger = winston.createLogger({
     level: process.env.LOG_LEVEL || 'info',
     format: winston.format.combine(
-        winston.format.timestamp(),
+        winston.format.timestamp({ format: timezoned }),
         winston.format.printf(({ level, message, timestamp, ...metadata }) => {
             const pid = process.pid;
             const context = requestContext.get();
@@ -39,6 +44,10 @@ const logger = winston.createLogger({
         // Combined logs
         new winston.transports.File({
             filename: path.join(logsDir, 'combined.log'),
+           format: winston.format.combine(
+                winston.format.timestamp({ format: timezoned }),
+                winston.format.prettyPrint()
+            ),
             maxsize: 5242880, // 5MB
             maxFiles: 5
         })

@@ -10,7 +10,8 @@ const VehicleSchema = new mongoose.Schema({
     enum: ["Available", "In Transit", "Maintenance"],
     default: "Available"
   },
-  currentLocation: { type: String, required: true }
+  currentLocation: { type: String, required: true },
+  operatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Operator' },
 }, { timestamps: true });
 
 module.exports = mongoose.model("Vehicle", VehicleSchema);

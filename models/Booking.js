@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const bookingSchema = new mongoose.Schema({
   bookingId: { type: String, unique: true },
+  bookingDate: { type: String, index: true },
   senderName: String,
   senderPhone: {type:String, required: true},
   senderEmail: String,
@@ -9,6 +10,7 @@ const bookingSchema = new mongoose.Schema({
   receiverName: String,
   receiverPhone:  {type:String, required: true},
   receiverEmail: String,
+
   receiverAddress: String,
   fromOffice: String,
   toOffice: String,
@@ -16,6 +18,8 @@ const bookingSchema = new mongoose.Schema({
   weight: String,
   dimensions: String,
   assignedVehicle: String,
+  operatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Operator' },
+  totalAmount: { type: Number, default: 0 },
   status: {
     type: String,
     enum: ['Booked', 'InTransit', 'Cancelled', 'Delivered'],
