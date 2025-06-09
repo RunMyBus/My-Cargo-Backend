@@ -1,0 +1,817 @@
+{
+	"info": {
+		"_postman_id": "7220635d-b6e3-4436-97a7-f1254d06e03e",
+		"name": "My Cargo",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "39835390"
+	},
+	"item": [
+		{
+			"name": "Login",
+			"item": [
+				{
+					"name": "login",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"mobile\": \"9999999990\",\r\n  \"password\": \"1234567890\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/auth/login",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Register",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"fullName\": \"Ravi\",\r\n  \"mobile\": \"9999999990\",\r\n  \"password\": \"1234567890\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/auth/register",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"auth",
+								"register"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Role",
+			"item": [
+				{
+					"name": "Create Role",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"rolecode\": \"ADMIN\",\r\n  \"rolename\": \"Administrator\",\r\n  \"description\": \"Has full access\",\r\n  \"permissions\": []\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/roles/",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"roles",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Role",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/roles/",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"roles",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Role By Id",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"rolecode\": \"ADMIN\",\r\n  \"rolename\": \"Administrator\",\r\n  \"description\": \"Has full access\",\r\n  \"permissions\": []\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/roles/683feadb9eaaf48e587ea012",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"roles",
+								"683feadb9eaaf48e587ea012"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Role",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"rolecode\": \"ADMIN 2\",\r\n  \"rolename\": \"Administrator\",\r\n  \"description\": \"Has full access Maybe\",\r\n  \"permissions\": []\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/roles/683feadb9eaaf48e587ea012",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"roles",
+								"683feadb9eaaf48e587ea012"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Role",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/roles/683feadb9eaaf48e587ea012",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"roles",
+								"683feadb9eaaf48e587ea012"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Role",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/roles/search?keyword=ADMIN&page=1",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"roles",
+								"search"
+							],
+							"query": [
+								{
+									"key": "keyword",
+									"value": "ADMIN"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Branch",
+			"item": [
+				{
+					"name": "Create Branch",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"branchId\": \"BR002\",\r\n  \"name\": \"Main Branch\",\r\n  \"address\": \"123 Cargo Street\",\r\n  \"phone\": \"9876543210\",\r\n  \"manager\": \"Someone 1\",\r\n  \"status\": \"active\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/branches/",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"branches",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Branches",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/branches/",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"branches",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Branch",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"branchId\": \"BR002\",\r\n  \"name\": \"Main Branch\",\r\n  \"address\": \"123 Cargo Street\",\r\n  \"phone\": \"9876543210\",\r\n  \"manager\": \"Someone 2\",\r\n  \"status\": \"active\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/branches/683ff987250bcdca84f3e8e5",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"branches",
+								"683ff987250bcdca84f3e8e5"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Branch By Id",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/branches/683ff987250bcdca84f3e8e5",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"branches",
+								"683ff987250bcdca84f3e8e5"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Branch",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/branches/683ff987250bcdca84f3e8e5",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"branches",
+								"683ff987250bcdca84f3e8e5"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "User",
+			"item": [
+				{
+					"name": "Create User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"fullName\": \"John\",\r\n  \"mobile\": \"9876543211\",\r\n  \"password\": \"SecurePass123\",\r\n  \"role\": \"683fece8fbe7330a444d10ff\", // role ObjectId\r\n  \"status\": \"active\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/users/",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"users",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Users",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/users/",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"users",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get User By Id",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/users/684011b785d314d990fb999d",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"users",
+								"684011b785d314d990fb999d"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"fullName\": \"John update\",\r\n  \"mobile\": \"9876543211\",\r\n  \"password\": \"newSecurePassword123\",\r\n  \"status\": \"inactive\",\r\n  \"role\": \"683fece8fbe7330a444d10ff\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/users/684011b785d314d990fb999d",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"users",
+								"684011b785d314d990fb999d"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/users/684011b785d314d990fb999d",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"users",
+								"684011b785d314d990fb999d"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Booking",
+			"item": [
+				{
+					"name": "New Booking",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"senderName\": \"John Doe\",\r\n  \"senderPhone\": \"1234567890\",\r\n  \"senderEmail\": \"john@example.com\",\r\n  \"senderAddress\": \"123 Sender St\",\r\n  \"receiverName\": \"Jane Smith\",\r\n  \"receiverPhone\": \"0987654321\",\r\n  \"receiverEmail\": \"jane@example.com\",\r\n  \"receiverAddress\": \"456 Receiver Ave\",\r\n  \"fromOffice\": \"683ff96d250bcdca84f3e8e2\",\r\n  \"toOffice\": \"6842d401583570175ab773ef\",\r\n  \"packageDescription\": \"Documents\",\r\n  \"weight\": \"2kg\",\r\n  \"dimensions\": \"10x10x10\",\r\n  \"type\": \"Paid\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/bookings/",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"bookings",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Booking",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
