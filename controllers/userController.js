@@ -1,11 +1,12 @@
 const User = require('../models/User');
 const Role = require('../models/Role');
 const bcrypt = require('bcryptjs');
+const requestContext = require('../utils/requestContext');
 
 // Get all users
 exports.getUsers = async (req, res) => {
   try {
-    const users = await User.find().populate('role');
+    const users = await User.find({operatorId: requestContext.getOperatorId()}).populate('role');
     res.status(200).json(users);
   } catch (error) {
     console.error('GET_USERS_ERROR:', error);
@@ -106,9 +107,13 @@ exports.searchUsers = async (req, res) => {
     const { query = "", page = 1, limit = 10 } = req.body;
     const regex = new RegExp(query, "i"); 
     const skip = (page - 1) * limit;
+    const operatorId = requestContext.getOperatorId();
 
-    const total = await User.countDocuments({ fullName: regex });
-    const users = await User.find({ fullName: regex })
+    const queryObj = query ? { fullName: regex } : {};
+    const baseQuery = { operatorId, ...queryObj };
+    
+    const total = await User.countDocuments(baseQuery);
+    const users = await User.find(baseQuery)
       .populate("role")
       .skip(skip)
       .limit(Number(limit));

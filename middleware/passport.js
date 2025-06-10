@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User'); 
 require('dotenv').config();
 
+const requestContext = require('../utils/requestContext');
 
 const localLogin = new LocalStrategy(
     { usernameField: 'mobile', passwordField: 'password', passReqToCallback: true },
@@ -28,8 +29,13 @@ const localLogin = new LocalStrategy(
           error.field = 'password';
           return done(error);
         }
-  
-        return done(null, user);
+
+        // Set operatorId in request context
+        const context = requestContext.get();
+        context.operatorId = user.operatorId;
+        requestContext.instance.storage.run(context, () => {
+          return done(null, user);
+        });
       } catch (err) {
         return done(err);
       }
@@ -51,15 +57,19 @@ const jwtLogin = new JwtStrategy(
         if (!user) {
           return done(null, false, { message: 'User not found' });
         }
-  
+
         const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
   
         if (user.token !== token) {
           return done(null, false, { message: 'Token mismatch' });
         }
-  
-        return done(null, user);
-  
+
+        // Set operatorId in request context
+        const context = requestContext.get();
+        context.operatorId = user.operatorId;
+        requestContext.instance.storage.run(context, () => {
+          return done(null, user);
+        });
       } catch (err) {
         return done(err, false, { message: 'Internal server error while verifying token' });
       }
