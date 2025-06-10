@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const passport = require('passport');
 const userController = require('../controllers/userController');
+
+router.use(passport.authenticate('jwt', { session: false }));
 
 // CRUD routes
 router.get('/', userController.getUsers);

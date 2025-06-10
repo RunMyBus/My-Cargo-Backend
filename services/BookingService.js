@@ -11,38 +11,64 @@ const BookingService = {
       });
 
       const booking = new Booking(data);
-      
-      // If booking type is paid, update user's cargo balance
-      if (booking.type === 'paid') {
+
+      // Get today's date parts for bookingDate and bookingId prefix
+      const now = new Date();
+      const pad = (n) => n.toString().padStart(2, '0');
+      const year = now.getFullYear();
+      const month = pad(now.getMonth() + 1);
+      const day = pad(now.getDate());
+
+      // Set bookingDate in YYYY-MM-DD format
+      booking.bookingDate = `${year}-${month}-${day}`;
+
+      // Construct bookingId prefix: type letter + YYYYMMDD
+      const typeCode = booking.type === 'Paid' ? 'P' : 'TU';
+      const dateStr = `${year}${month}${day}`;
+      const prefix = `${typeCode}${dateStr}`;
+
+      // Find last bookingId with this prefix (type + date) to get sequence number
+      const regex = new RegExp(`^${prefix}(\\d{3})$`);
+      const lastBooking = await Booking.findOne({ bookingId: { $regex: regex } })
+        .sort({ bookingId: -1 })
+        .exec();
+
+      let sequence = 1;
+      if (lastBooking && lastBooking.bookingId) {
+        const lastSeq = parseInt(lastBooking.bookingId.slice(-3), 10);
+        sequence = lastSeq + 1;
+      }
+
+      const sequenceStr = sequence.toString().padStart(3, '0');
+      booking.bookingId = `${prefix}${sequenceStr}`;  // e.g. P20250609001
+
+      // Update user's cargo balance if type is 'Paid'
+      if (booking.type === 'Paid') {
         const user = await User.findById(userId);
         if (!user) {
           logger.error('User not found when updating cargo balance', {
             userId,
-            bookingId: booking._id
+            bookingId: booking.bookingId
           });
           throw new Error('User not found');
         }
 
-        // Update user's cargo balance
         user.cargoBalance = user.cargoBalance || 0;
-        user.cargoBalance += booking.amount;
+        user.cargoBalance += booking.totalAmount;
         await user.save();
 
-        // Log cargo balance update
         logger.info('Cargo balance updated', {
           userId: user._id,
           newBalance: user.cargoBalance,
-          amountAdded: booking.amount,
-          bookingId: booking._id
+          amountAdded: booking.totalAmount,
+          bookingId: booking.bookingId
         });
       }
 
       await booking.save();
 
-      // Log successful booking creation
       logger.info('Booking created successfully', { 
-        bookingId: booking._id,
-        bookingNumber: booking.bookingId
+        bookingId: booking.bookingId
       });
 
       return booking;
