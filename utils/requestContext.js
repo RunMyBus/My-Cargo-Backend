@@ -21,7 +21,8 @@ class RequestContext {
                 requestId: `${new mongoose.Types.ObjectId()} - ${req.originalUrl}`,
                 timestamp: new Date(),
                 pid: process.pid,
-                userId: req.user?.id // if you have user info in request
+                userId: req.user?.id,
+                operatorId: req.user?.operatorId
             };
             this.storage.run(context, () => {
                 next();
@@ -30,4 +31,15 @@ class RequestContext {
     }
 }
 
-module.exports = new RequestContext();
+module.exports = {
+    instance: new RequestContext(),
+    get() {
+        return this.instance.get();
+    },
+    getRequestId() {
+        return this.instance.getRequestId();
+    },
+    getOperatorId() {
+        return this.get().operatorId;
+    }
+};
