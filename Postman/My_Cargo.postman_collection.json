@@ -614,7 +614,14 @@
 					},
 					"request": {
 						"auth": {
-							"type": "noauth"
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
 						},
 						"method": "GET",
 						"header": [],
@@ -765,46 +772,6 @@
 						}
 					},
 					"response": []
-				},
-				{
-					"name": "Search User",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\r\n    \"fullName\": \"Ravi\"\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "http://localhost:4600/api/users/search",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "4600",
-							"path": [
-								"api",
-								"users",
-								"search"
-							]
-						}
-					},
-					"response": []
 				}
 			]
 		},
@@ -855,7 +822,10 @@
 					"name": "Get All Booking",
 					"request": {
 						"method": "GET",
-						"header": []
+						"header": [],
+						"url": {
+							"raw": ""
+						}
 					},
 					"response": []
 				},
@@ -1141,6 +1111,84 @@
 							"path": [
 								"api",
 								"vehicle",
+								"search"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Operator",
+			"item": [
+				{
+					"name": "Create Operator",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Whizzard\",\n    \"address\": \"Bangalore\",\n    \"phone\": \"0123456789\",\n    \"status\": \"active\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/operators/create",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"operators",
+								"create"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Operator",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"query\": \"\",\n    \"page\": 1,\n    \"limit\": 10\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/operators/search",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"operators",
 								"search"
 							]
 						}

@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const passport = require('passport');
 const userController = require('../controllers/userController');
+const passport = require('passport');
+
+router.use(passport.authenticate('jwt', { session: false }));
 
 router.use(passport.authenticate('jwt', { session: false }));
 
@@ -13,4 +16,4 @@ router.post('/', userController.createUser);
 router.put('/:id', userController.updateUser);
 router.delete('/:id', userController.deleteUser);
 
-module.exports = router;
+module.exports = router;    
