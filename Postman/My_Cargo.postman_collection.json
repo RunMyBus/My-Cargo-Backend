@@ -553,6 +553,14 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Get Batch",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
 				}
 			]
 		},
@@ -764,46 +772,6 @@
 						}
 					},
 					"response": []
-				},
-				{
-					"name": "search users",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"query\": \"\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "http://localhost:4600/api/users/search",
-							"protocol": "http",
-							"host": [
-								"localhost"
-							],
-							"port": "4600",
-							"path": [
-								"api",
-								"users",
-								"search"
-							]
-						}
-					},
-					"response": []
 				}
 			]
 		},
@@ -811,7 +779,7 @@
 			"name": "Booking",
 			"item": [
 				{
-					"name": "New Booking",
+					"name": "Create Booking",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -857,6 +825,294 @@
 						"header": [],
 						"url": {
 							"raw": ""
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get booking By Id",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/bookings/684695349b1f429607eaa324",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"bookings",
+								"684695349b1f429607eaa324"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Booking",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/bookings/684695349b1f429607eaa324",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"bookings",
+								"684695349b1f429607eaa324"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Booking",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/bookings/684695349b1f429607eaa324",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"bookings",
+								"684695349b1f429607eaa324"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Unassigned",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				},
+				{
+					"name": "Search Booking",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"senderPhone\": \"1234567890\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/bookings/search",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"bookings",
+								"search"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Vehicle",
+			"item": [
+				{
+					"name": "Add Vehicle",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"vehicleNumber\": \"MH12AB1235\",\r\n  \"type\": \"Truck\",\r\n  \"capacity\": \"2000kg\",\r\n  \"driver\": \"Ravi Kumar\",\r\n  \"status\": \"Available\",\r\n  \"currentLocation\": \"Pune\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/vehicle",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"vehicle"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Vehicle",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				},
+				{
+					"name": "Update Vehicle",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n\r\n            \"type\": \"Truck Update test\",\r\n            \"capacity\": \"2500kg\"\r\n        }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/vehicle/684681448a10423648aa578a",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"vehicle",
+								"684681448a10423648aa578a"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Vehicle",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n\r\n    \"type\": \"Truck Update test\"\r\n           \r\n }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:4600/api/vehicle/search",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "4600",
+							"path": [
+								"api",
+								"vehicle",
+								"search"
+							]
 						}
 					},
 					"response": []

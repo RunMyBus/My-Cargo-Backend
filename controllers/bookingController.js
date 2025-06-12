@@ -1,4 +1,6 @@
 const BookingService = require('../services/BookingService');
+const Booking = require('../models/Booking');
+const Vehicle = require('../models/Vehicle');
 
 // Create booking
 exports.createBooking = async (req, res) => {
@@ -12,19 +14,18 @@ exports.createBooking = async (req, res) => {
 
 exports.getAllBookings = async (req, res) => {
   try {
-    // Get all bookings sorted by creation date descending
-    const bookings = await Booking.find().sort({ createdAt: -1 });
+    const bookings = await Booking.find()
+      .populate('fromOffice', 'name')
+      .populate('toOffice', 'name')
+      .populate('assignedVehicle', 'name number');
 
-    // Total count of bookings
     const totalCount = await Booking.countDocuments();
 
-    // Calculate the start of today (midnight)
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
 
-    // Count bookings created today (createdAt >= startOfToday)
     const todayCount = await Booking.countDocuments({
-      createdAt: { $gte: startOfToday }
+      createdAt: { $gte: todayStart },
     });
 
     res.json({
@@ -32,22 +33,62 @@ exports.getAllBookings = async (req, res) => {
       totalCount,
       todayCount,
     });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 };
 
+exports.getUnassignedBookings = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const total = await Booking.countDocuments({ assignedVehicle: null });
+
+    const bookings = await Booking.find({ assignedVehicle: null })
+      .skip(skip)
+      .limit(limit)
+      .populate('fromOffice', 'name') // Only _id and name
+      .populate('toOffice', 'name')
+      .populate('assignedVehicle', 'name number'); // Example fields
+
+    res.json({
+      bookings,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      count: bookings.length,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
 
 // Get booking by ID
-exports.getBooking = async (req, res) => {
+exports.getBookingById = async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ error: 'Booking not found' });
-    res.json(booking);
+    const booking = await Booking.findById(req.params.id)
+      .populate('fromOffice', '_id name')
+      .populate('toOffice', '_id name')
+      .populate('assignedVehicle', '_id vehicleNumber');
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const formattedBooking = {
+      ...booking.toObject(),
+      senderName: booking.assignedVehicle?.vehicleNumber || "Assign vehicleNumber"
+    };
+
+    res.json(formattedBooking);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 };
+
+
 
 // Update booking by ID (including status)
 exports.updateBooking = async (req, res) => {
@@ -79,7 +120,6 @@ exports.searchBookingsPost = async (req, res) => {
     const mongoQuery = {};
 
     if (query && query.trim() !== "") {
-      // Search bookingId OR senderName OR receiverName with case-insensitive regex
       mongoQuery.$or = [
         { bookingId: { $regex: query.trim(), $options: "i" } },
         { senderName: { $regex: query.trim(), $options: "i" } },
@@ -94,10 +134,28 @@ exports.searchBookingsPost = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const total = await Booking.countDocuments(mongoQuery);
-    const bookings = await Booking.find(mongoQuery)
+
+    const bookingsRaw = await Booking.find(mongoQuery)
       .skip(skip)
       .limit(parseInt(limit))
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .populate({ path: 'fromOffice', select: '_id name' })
+      .populate({ path: 'toOffice', select: '_id name' })
+      .populate({ path: 'assignedVehicle', select: '_id vehicleNumber' });
+
+    const bookings = bookingsRaw.map((booking) => {
+      const b = booking.toObject();
+
+      // Transform assignedVehicle to have "assignedVehicle": vehicleNumber
+      if (b.assignedVehicle) {
+        b.assignedVehicle = {
+          _id: b.assignedVehicle._id,
+          assignedVehicle: b.assignedVehicle.vehicleNumber
+        };
+      }
+
+      return b;
+    });
 
     res.json({
       total,
@@ -109,4 +167,3 @@ exports.searchBookingsPost = async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 };
-
