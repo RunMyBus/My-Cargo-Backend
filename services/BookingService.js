@@ -56,13 +56,13 @@ class BookingService {
           throw new Error('User not found');
         }
         user.cargoBalance = user.cargoBalance || 0;
-        user.cargoBalance += booking.totalAmountCharge;
+        user.cargoBalance += booking.totalAmount;
         await user.save();
 
         logger.info('Cargo balance updated', {
           userId: user._id,
           newBalance: user.cargoBalance,
-          amountAdded: booking.totalAmountCharge,
+          amountAdded: booking.totalAmount,
           bookingId: booking.bookingId
         });
       }

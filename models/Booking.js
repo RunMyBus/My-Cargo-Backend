@@ -15,7 +15,7 @@ const bookingSchema = new mongoose.Schema({
   toOffice: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
   packageDescription: String,
   weight: { type: Number, required: true },
-  totalAmountCharge: { type: Number, required: true },
+  totalAmount: { type: Number, required: true },
   assignedVehicle: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Vehicle',
