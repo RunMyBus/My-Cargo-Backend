@@ -9,7 +9,7 @@ const userSchema = new mongoose.Schema({
   cargoBalance: { type: Number, default: 0 }, // Cargo balance  
   status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },
-      operatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Operator' }
+  operatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Operator' }
 },
 {timestamps: true});
 

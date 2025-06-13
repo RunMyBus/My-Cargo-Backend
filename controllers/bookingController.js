@@ -12,15 +12,25 @@ exports.createBooking = async (req, res) => {
   }
 };
 
+/**
+ * Get all bookings
+ * @returns {Promise<Object>} JSON object with bookings and stats
+ * @property {Booking[]} bookings - Array of bookings
+ * @property {Number} totalCount - Total number of bookings
+ * @property {Number} todayCount - Number of bookings created today
+ */
 exports.getAllBookings = async (req, res) => {
   try {
+    // Get all bookings
     const bookings = await Booking.find()
-      .populate('fromOffice', 'name')
+      .populate('fromOffice', 'name') // Only _id and name
       .populate('toOffice', 'name')
-      .populate('assignedVehicle', 'name number');
+      .populate('assignedVehicle', 'name number'); // Example fields
 
+    // Get total count of bookings
     const totalCount = await Booking.countDocuments();
 
+    // Get count of bookings created today
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
@@ -28,12 +38,14 @@ exports.getAllBookings = async (req, res) => {
       createdAt: { $gte: todayStart },
     });
 
+    // Return JSON object with bookings and stats
     res.json({
       bookings,
       totalCount,
       todayCount,
     });
   } catch (err) {
+    // Internal Server Error
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };

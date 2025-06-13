@@ -23,7 +23,7 @@ const BookingService = {
       booking.bookingDate = `${year}-${month}-${day}`;
 
       // Construct bookingId prefix: type letter + YYYYMMDD
-      const typeCode = booking.type === 'Paid' ? 'P' : 'TU';
+      const typeCode = booking.type === 'Paid' ? 'P' : 'TP';
       const dateStr = `${year}${month}${day}`;
       const prefix = `${typeCode}${dateStr}`;
 

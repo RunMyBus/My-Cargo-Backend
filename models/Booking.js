@@ -9,7 +9,6 @@ const bookingSchema = new mongoose.Schema({
   receiverName: String,
   receiverPhone: { type: String, required: true },
   receiverEmail: String,
-
   receiverAddress: String,
   fromOffice: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
   toOffice: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
@@ -28,7 +27,7 @@ const bookingSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['Paid', 'UnPaid'],
+    enum: ['Paid', 'ToPay'],
     default: 'Paid',
     required: true
   },
