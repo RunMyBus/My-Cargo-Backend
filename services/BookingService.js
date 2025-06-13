@@ -1,6 +1,7 @@
 const Booking = require('../models/Booking');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const mongoose = require('mongoose');
 
 class BookingService {
   static async createBooking(data, userId, operatorId) {
@@ -55,13 +56,13 @@ class BookingService {
           throw new Error('User not found');
         }
         user.cargoBalance = user.cargoBalance || 0;
-        user.cargoBalance += booking.totalAmount;
+        user.cargoBalance += booking.totalAmountCharge;
         await user.save();
 
         logger.info('Cargo balance updated', {
           userId: user._id,
           newBalance: user.cargoBalance,
-          amountAdded: booking.totalAmount,
+          amountAdded: booking.totalAmountCharge,
           bookingId: booking.bookingId
         });
       }
