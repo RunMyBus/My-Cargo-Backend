@@ -1,45 +1,29 @@
-const Vehicle = require("../models/Vehicle");
-
+const VehicleService = require('../services/VehicleService');
 
 // GET /vehicles
 exports.getAllVehicles = async (req, res) => {
   try {
-    const vehicles = await Vehicle.find();
-
-    const total = await Vehicle.countDocuments();
-
-    // Count of active (available) vehicles
-    const activeCount = await Vehicle.countDocuments({ status: "Available" });
-
-    res.json({
-      data: vehicles,
-      total,
-      activeCount, // newly added
-    });
+    const operatorId = req.user.operatorId; // Assuming operatorId is available in req.user
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+    const result = await VehicleService.getAllVehicles(operatorId);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-
 // GET /vehicles/search
 exports.searchVehicles = async (req, res) => {
   try {
-    const { query = "", page = 1, limit = 10 } = req.body; // from req.body now
-    const regex = new RegExp(query, "i"); // case-insensitive search
-    const skip = (page - 1) * limit;
-
-    const total = await Vehicle.countDocuments({ vehicleNumber: regex });
-    const vehicles = await Vehicle.find({ vehicleNumber: regex })
-      .skip(skip)
-      .limit(Number(limit));
-
-    res.json({
-      data: vehicles,
-      total,
-      page: Number(page),
-      totalPages: Math.ceil(total / limit)
-    });
+    const operatorId = req.user.operatorId;
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+    const { query = "", page = 1, limit = 10 } = req.body;
+    const result = await VehicleService.searchVehicles(operatorId, query, page, limit);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -48,8 +32,11 @@ exports.searchVehicles = async (req, res) => {
 // POST /vehicles
 exports.createVehicle = async (req, res) => {
   try {
-    const vehicle = new Vehicle(req.body);
-    await vehicle.save();
+    const operatorId = req.user.operatorId;
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+    const vehicle = await VehicleService.createVehicle(operatorId, req.body);
     res.status(201).json(vehicle);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -59,15 +46,16 @@ exports.createVehicle = async (req, res) => {
 // PUT /vehicles/:id
 exports.updateVehicle = async (req, res) => {
   try {
-    const vehicle = await Vehicle.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true
-    });
-
-    if (!vehicle) return res.status(404).json({ error: "Vehicle not found" });
-
+    const operatorId = req.user.operatorId;
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+    const vehicle = await VehicleService.updateVehicle(operatorId, req.params.id, req.body);
     res.json(vehicle);
   } catch (err) {
+    if (err.message === 'Vehicle not found') {
+      return res.status(404).json({ error: err.message });
+    }
     res.status(400).json({ error: err.message });
   }
 };
@@ -75,11 +63,16 @@ exports.updateVehicle = async (req, res) => {
 // DELETE /vehicles/:id
 exports.deleteVehicle = async (req, res) => {
   try {
-    const vehicle = await Vehicle.findByIdAndDelete(req.params.id);
-    if (!vehicle) return res.status(404).json({ error: "Vehicle not found" });
-
-    res.json({ message: "Vehicle deleted successfully" });
+    const operatorId = req.user.operatorId;
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+    const result = await VehicleService.deleteVehicle(operatorId, req.params.id);
+    res.json(result);
   } catch (err) {
+    if (err.message === 'Vehicle not found') {
+      return res.status(404).json({ error: err.message });
+    }
     res.status(500).json({ error: err.message });
   }
 };

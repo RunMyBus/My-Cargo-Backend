@@ -1,9 +1,9 @@
 {
 	"info": {
-		"_postman_id": "7220635d-b6e3-4436-97a7-f1254d06e03e",
-		"name": "My Cargo",
+		"_postman_id": "10c3a085-88c2-4164-b12e-5b592404f921",
+		"name": "My_Cargo",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "39835390"
+		"_exporter_id": "12433927"
 	},
 	"item": [
 		{
@@ -558,7 +558,10 @@
 					"name": "Get Batch",
 					"request": {
 						"method": "GET",
-						"header": []
+						"header": [],
+						"url": {
+							"raw": ""
+						}
 					},
 					"response": []
 				}
@@ -951,7 +954,10 @@
 					"name": "Get Unassigned",
 					"request": {
 						"method": "GET",
-						"header": []
+						"header": [],
+						"url": {
+							"raw": ""
+						}
 					},
 					"response": []
 				},
@@ -1033,7 +1039,10 @@
 					"name": "Get All Vehicle",
 					"request": {
 						"method": "GET",
-						"header": []
+						"header": [],
+						"url": {
+							"raw": ""
+						}
 					},
 					"response": []
 				},
@@ -1126,13 +1135,20 @@
 					"name": "Create Operator",
 					"request": {
 						"auth": {
-							"type": "noauth"
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYmM0YjhkOWZhMzRhMWM1Yjk1OTQiLCJpYXQiOjE3NDk3OTM4ODIsImV4cCI6MTc0OTg4MDI4Mn0.Css_bwm-vlnbjmd3mfLBKuz0GfYkzyFn0cfNzrUy5tc",
+									"type": "string"
+								}
+							]
 						},
 						"method": "POST",
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Whizzard\",\n    \"address\": \"Bangalore\",\n    \"phone\": \"0123456789\",\n    \"status\": \"active\"\n}",
+							"raw": "{\n    \"name\": \"Whizzarddd\",\n    \"address\": \"Bangalore\",\n    \"phone\": \"0123456789\",\n    \"status\": \"active\",\n    \"code\": \"WIZZZ\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
