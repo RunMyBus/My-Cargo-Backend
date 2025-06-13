@@ -85,16 +85,6 @@
 				{
 					"name": "Create Role",
 					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{token}}",
-									"type": "string"
-								}
-							]
-						},
 						"method": "POST",
 						"header": [],
 						"body": {
@@ -107,12 +97,10 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:4600/api/roles/",
-							"protocol": "http",
+							"raw": "{{base_url}}/api/roles/",
 							"host": [
-								"localhost"
+								"{{base_url}}"
 							],
-							"port": "4600",
 							"path": [
 								"api",
 								"roles",
@@ -782,21 +770,11 @@
 				{
 					"name": "Create Booking",
 					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{token}}",
-									"type": "string"
-								}
-							]
-						},
 						"method": "POST",
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n  \"senderName\": \"John Doe\",\r\n  \"senderPhone\": \"1234567890\",\r\n  \"senderEmail\": \"john@example.com\",\r\n  \"senderAddress\": \"123 Sender St\",\r\n  \"receiverName\": \"Jane Smith\",\r\n  \"receiverPhone\": \"0987654321\",\r\n  \"receiverEmail\": \"jane@example.com\",\r\n  \"receiverAddress\": \"456 Receiver Ave\",\r\n  \"fromOffice\": \"683ff96d250bcdca84f3e8e2\",\r\n  \"toOffice\": \"6842d401583570175ab773ef\",\r\n  \"packageDescription\": \"Documents\",\r\n  \"weight\": \"2kg\",\r\n  \"dimensions\": \"10x10x10\",\r\n  \"type\": \"Paid\"\r\n}",
+							"raw": "{\r\n  \"senderName\": \"John Doe\",\r\n  \"senderPhone\": \"1234567890\",\r\n  \"senderEmail\": \"john@example.com\",\r\n  \"senderAddress\": \"123 Sender St\",\r\n  \"receiverName\": \"Jane Smith\",\r\n  \"receiverPhone\": \"0987654321\",\r\n  \"receiverEmail\": \"jane@example.com\",\r\n  \"receiverAddress\": \"456 Receiver Ave\",\r\n  \"fromOffice\": \"683ff96d250bcdca84f3e8e2\",\r\n  \"toOffice\": \"6842d401583570175ab773ef\",\r\n  \"packageDescription\": \"Documents\",\r\n  \"totalAmount\":100,\r\n  \"weight\": \"2\",\r\n  \"dimensions\": \"10x10x10\",\r\n  \"type\": \"Paid\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -804,12 +782,10 @@
 							}
 						},
 						"url": {
-							"raw": "http://localhost:4600/api/bookings/",
-							"protocol": "http",
+							"raw": "{{base_url}}/api/bookings/",
 							"host": [
-								"localhost"
+								"{{base_url}}"
 							],
-							"port": "4600",
 							"path": [
 								"api",
 								"bookings",
@@ -1215,7 +1191,7 @@
 		"bearer": [
 			{
 				"key": "token",
-				"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYmM0YjhkOWZhMzRhMWM1Yjk1OTQiLCJpYXQiOjE3NDk3OTM4ODIsImV4cCI6MTc0OTg4MDI4Mn0.Css_bwm-vlnbjmd3mfLBKuz0GfYkzyFn0cfNzrUy5tc",
+				"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYmM0YjhkOWZhMzRhMWM1Yjk1OTQiLCJpYXQiOjE3NDk4MDYyNDYsImV4cCI6MTc0OTg5MjY0Nn0.5Z-rggsQhB-eprVJrllOQumrLXnqhO4enJqbfLnfPn0",
 				"type": "string"
 			}
 		]
@@ -1245,7 +1221,7 @@
 	"variable": [
 		{
 			"key": "token",
-			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYmM0YjhkOWZhMzRhMWM1Yjk1OTQiLCJpYXQiOjE3NDk3OTM4ODIsImV4cCI6MTc0OTg4MDI4Mn0.Css_bwm-vlnbjmd3mfLBKuz0GfYkzyFn0cfNzrUy5tc",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYmM0YjhkOWZhMzRhMWM1Yjk1OTQiLCJpYXQiOjE3NDk4MDQ4MjIsImV4cCI6MTc0OTg5MTIyMn0.vg6sb6lva2CUAMT4M3R4kLqS7BPXtXBm97S6h1VDmts",
 			"type": "string"
 		},
 		{

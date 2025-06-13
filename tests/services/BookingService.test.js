@@ -2,9 +2,23 @@ const mongoose = require('mongoose');
 const BookingService = require('../../services/BookingService');
 const Booking = require('../../models/Booking');
 const User = require('../../models/User');
+const Branch = require('../../models/Branch');
 
 // Mock the mongoose models
 jest.mock('mongoose');
+
+// Mock the Branch model
+const mockFromBranch = {
+  _id: '60d21b4667d0d8992e610c88',
+  name: 'Origin Branch',
+  status: 'active'
+};
+
+const mockToBranch = {
+  _id: '60d21b4667d0d8992e610c89',
+  name: 'Destination Branch',
+  status: 'active'
+};
 
 // Mock the Operator model
 const mockOperator = {
@@ -59,6 +73,13 @@ describe('BookingService', () => {
       return {
         findById: jest.fn().mockResolvedValue(mockUser)
       };
+    });
+
+    // Setup Branch model mock
+    Branch.findOne = jest.fn().mockImplementation(({ _id }) => {
+      if (_id.toString() === mockFromBranch._id) return Promise.resolve(mockFromBranch);
+      if (_id.toString() === mockToBranch._id) return Promise.resolve(mockToBranch);
+      return Promise.resolve(null);
     });
 
     // Setup Booking model mock
@@ -146,6 +167,45 @@ describe('BookingService', () => {
       await expect(BookingService.createBooking(bookingData, userId, operatorId))
         .rejects
         .toThrow('User not found');
+    });
+
+    it('should throw an error if origin branch is invalid', async () => {
+      Branch.findOne.mockImplementationOnce(() => Promise.resolve(null));
+      
+      await expect(BookingService.createBooking(bookingData, userId, operatorId))
+        .rejects
+        .toThrow('Invalid or inactive origin branch');
+    });
+
+    it('should throw an error if destination branch is invalid', async () => {
+      Branch.findOne
+        .mockImplementationOnce(() => Promise.resolve(mockFromBranch)) // First call (origin) succeeds
+        .mockImplementationOnce(() => Promise.resolve(null)); // Second call (destination) fails
+      
+      await expect(BookingService.createBooking(bookingData, userId, operatorId))
+        .rejects
+        .toThrow('Invalid or inactive destination branch');
+    });
+
+    it('should throw an error if origin and destination are the same', async () => {
+      const sameBranchData = {
+        ...bookingData,
+        fromOffice: mockFromBranch._id,
+        toOffice: mockFromBranch._id
+      };
+      
+      await expect(BookingService.createBooking(sameBranchData, userId, operatorId))
+        .rejects
+        .toThrow('Origin and destination branches cannot be the same');
+    });
+    
+    it('should only allow active branches', async () => {
+      const inactiveBranch = { ...mockFromBranch, status: 'inactive' };
+      Branch.findOne.mockImplementationOnce(() => Promise.resolve(inactiveBranch));
+      
+      await expect(BookingService.createBooking(bookingData, userId, operatorId))
+        .rejects
+        .toThrow('Invalid or inactive origin branch');
     });
   });
 });

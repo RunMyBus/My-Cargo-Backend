@@ -1,5 +1,6 @@
 const Booking = require('../models/Booking');
 const User = require('../models/User');
+const Branch = require('../models/Branch');
 const logger = require('../utils/logger');
 const mongoose = require('mongoose');
 
@@ -10,6 +11,22 @@ class BookingService {
         userId,
         bookingData: data
       });
+
+      // Validate branch offices
+      const [fromBranch, toBranch] = await Promise.all([
+        Branch.findOne({ _id: data.fromOffice, operatorId, status: 'active' }),
+        Branch.findOne({ _id: data.toOffice, operatorId, status: 'active' })
+      ]);
+
+      if (!fromBranch) {
+        throw new Error('Invalid or inactive origin branch');
+      }
+      if (!toBranch) {
+        throw new Error('Invalid or inactive destination branch');
+      }
+      if (data.fromOffice.toString() === data.toOffice.toString()) {
+        throw new Error('Origin and destination branches cannot be the same');
+      }
 
       const booking = new Booking({
         ...data,
