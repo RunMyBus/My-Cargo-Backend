@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const bookingSchema = new mongoose.Schema({
   bookingId: { type: String, unique: true, required: true },
+  operatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Operator' },
   senderName: String,
   senderPhone: { type: String, required: true },
   senderEmail: String,

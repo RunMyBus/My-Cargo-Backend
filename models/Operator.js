@@ -5,6 +5,7 @@ const operatorSchema = new mongoose.Schema({
     code : {type: String, required: true},
     address: { type: String },
     phone: { type: String, required: true },
+    bookingSequence: { type: Number, default: 1},
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },

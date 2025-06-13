@@ -1,13 +1,17 @@
 const BookingService = require('../services/BookingService');
-const Booking = require('../models/Booking');
-const Vehicle = require('../models/Vehicle');
+const logger = require('../utils/logger');
 
 // Create booking
 exports.createBooking = async (req, res) => {
   try {
-    const booking = await BookingService.createBooking(req.body, req.user._id);
+    const operatorId = req.user.operatorId;
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+    const booking = await BookingService.createBooking(req.body, req.user._id, operatorId);
     res.status(201).json(booking);
   } catch (error) {
+    logger.error('Error creating booking in controller', { error: error.message });
     res.status(400).json({ error: error.message });
   }
 };
@@ -15,167 +19,128 @@ exports.createBooking = async (req, res) => {
 /**
  * Get all bookings
  * @returns {Promise<Object>} JSON object with bookings and stats
- * @property {Booking[]} bookings - Array of bookings
- * @property {Number} totalCount - Total number of bookings
- * @property {Number} todayCount - Number of bookings created today
  */
 exports.getAllBookings = async (req, res) => {
   try {
-    // Get all bookings
-    const bookings = await Booking.find()
-      .populate('fromOffice', 'name') // Only _id and name
-      .populate('toOffice', 'name')
-      .populate('assignedVehicle', 'name number'); // Example fields
-
-    // Get total count of bookings
-    const totalCount = await Booking.countDocuments();
-
-    // Get count of bookings created today
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-
-    const todayCount = await Booking.countDocuments({
-      createdAt: { $gte: todayStart },
-    });
-
-    // Return JSON object with bookings and stats
-    res.json({
-      bookings,
-      totalCount,
-      todayCount,
-    });
-  } catch (err) {
-    // Internal Server Error
+    const operatorId = req.user.operatorId;
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+    const result = await BookingService.getAllBookings(operatorId);
+    res.json(result);
+  } catch (error) {
+    logger.error('Error getting all bookings in controller', { error: error.message });
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
 
+/**
+ * Get unassigned bookings with pagination
+ */
 exports.getUnassignedBookings = async (req, res) => {
   try {
+    const operatorId = req.user.operatorId;
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    const total = await Booking.countDocuments({ assignedVehicle: null });
-
-    const bookings = await Booking.find({ assignedVehicle: null })
-      .skip(skip)
-      .limit(limit)
-      .populate('fromOffice', 'name') // Only _id and name
-      .populate('toOffice', 'name')
-      .populate('assignedVehicle', 'name number'); // Example fields
-
-    res.json({
-      bookings,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-      count: bookings.length,
-    });
-  } catch (err) {
+    
+    const result = await BookingService.getUnassignedBookings(operatorId, page, limit);
+    res.json(result);
+  } catch (error) {
+    logger.error('Error getting unassigned bookings in controller', { error: error.message });
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
 
-// Get booking by ID
+/**
+ * Get booking by ID
+ */
 exports.getBookingById = async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id)
-      .populate('fromOffice', '_id name')
-      .populate('toOffice', '_id name')
-      .populate('assignedVehicle', '_id vehicleNumber');
-
+    const operatorId = req.user.operatorId;
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+    const booking = await BookingService.getBookingById(req.params.id, operatorId);
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
     }
-
-    const formattedBooking = {
-      ...booking.toObject(),
-      senderName: booking.assignedVehicle?.vehicleNumber || "Assign vehicleNumber"
-    };
-
-    res.json(formattedBooking);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-};
-
-
-
-// Update booking by ID (including status)
-exports.updateBooking = async (req, res) => {
-  try {
-    // allow status update by including it in req.body
-    const booking = await Booking.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!booking) return res.status(404).json({ error: 'Booking not found' });
     res.json(booking);
   } catch (error) {
+    if (error.message === 'Booking not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    logger.error(`Error getting booking by id in controller: ${req.params.id}`, { error: error.message });
     res.status(400).json({ error: error.message });
   }
 };
 
-// Delete booking by ID
+/**
+ * Update booking by ID
+ */
+exports.updateBooking = async (req, res) => {
+  try {
+    const operatorId = req.user.operatorId;
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+    const booking = await BookingService.updateBooking(
+      req.params.id, 
+      req.body,
+      operatorId
+    );
+    res.json(booking);
+  } catch (error) {
+    if (error.message === 'Booking not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    logger.error(`Error updating booking in controller: ${req.params.id}`, { error: error.message });
+    res.status(400).json({ error: error.message });
+  }
+};
+
+/**
+ * Delete booking by ID
+ */
 exports.deleteBooking = async (req, res) => {
   try {
-    const booking = await Booking.findByIdAndDelete(req.params.id);
-    if (!booking) return res.status(404).json({ error: 'Booking not found' });
-    res.json({ message: 'Booking deleted' });
+    const operatorId = req.user.operatorId;
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+    const result = await BookingService.deleteBooking(req.params.id, operatorId);
+    res.json(result);
   } catch (error) {
+    if (error.message === 'Booking not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    logger.error(`Error deleting booking in controller: ${req.params.id}`, { error: error.message });
     res.status(400).json({ error: error.message });
   }
 };
 
+/**
+ * Search bookings with filters
+ */
 exports.searchBookingsPost = async (req, res) => {
   try {
+    const operatorId = req.user.operatorId;
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
     const { limit = 10, page = 1, query = "", status } = req.body;
-
-    const mongoQuery = {};
-
-    if (query && query.trim() !== "") {
-      mongoQuery.$or = [
-        { bookingId: { $regex: query.trim(), $options: "i" } },
-        { senderName: { $regex: query.trim(), $options: "i" } },
-        { receiverName: { $regex: query.trim(), $options: "i" } },
-      ];
-    }
-
-    if (status && status.trim() !== "") {
-      mongoQuery.status = status.trim();
-    }
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const total = await Booking.countDocuments(mongoQuery);
-
-    const bookingsRaw = await Booking.find(mongoQuery)
-      .skip(skip)
-      .limit(parseInt(limit))
-      .sort({ createdAt: -1 })
-      .populate({ path: 'fromOffice', select: '_id name' })
-      .populate({ path: 'toOffice', select: '_id name' })
-      .populate({ path: 'assignedVehicle', select: '_id vehicleNumber' });
-
-    const bookings = bookingsRaw.map((booking) => {
-      const b = booking.toObject();
-
-      // Transform assignedVehicle to have "assignedVehicle": vehicleNumber
-      if (b.assignedVehicle) {
-        b.assignedVehicle = {
-          _id: b.assignedVehicle._id,
-          assignedVehicle: b.assignedVehicle.vehicleNumber
-        };
-      }
-
-      return b;
+    const result = await BookingService.searchBookings({ 
+      operatorId,
+      limit, 
+      page, 
+      query, 
+      status 
     });
-
-    res.json({
-      total,
-      page: parseInt(page),
-      pages: Math.ceil(total / limit),
-      bookings,
-    });
+    res.json(result);
   } catch (error) {
+    logger.error('Error searching bookings in controller', { error: error.message });
     res.status(400).json({ error: error.message });
   }
 };
