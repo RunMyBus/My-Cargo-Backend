@@ -1,40 +1,44 @@
 const Role = require('../models/Role');
 const Permission = require('../models/Permission');
+const requestContext = require('../utils/requestContext');
 
-
-
-// Create a new role
 exports.createRole = async (req, res) => {
-    try {
-        const { rolename, description, permissions } = req.body;
+  try {
+    const { rolename, description, permissions } = req.body;
+    const operatorId = requestContext.getOperatorId();
 
-        if (!rolename || !description) {
-            return res.status(400).json({ message: 'Rolename and description are required' });
-        }
-
-        // Step 1: Get the highest existing rolecode
-        const lastRole = await Role.findOne({})
-            .sort({ rolecode: -1 }) 
-            .collation({ locale: "en", numericOrdering: true }); 
-
-        // Step 2: Determine the next code
-        let nextCode = '0001'; // default for the first role
-        if (lastRole && lastRole.rolecode) {
-            const numericCode = parseInt(lastRole.rolecode, 10) + 1;
-            nextCode = numericCode.toString().padStart(4, '0'); 
-        }
-
-        // Step 3: Save new role with auto-generated rolecode
-        const role = new Role({ rolecode: nextCode, rolename, description, permissions });
-        await role.save();
-
-        res.status(201).json({ message: 'Role created successfully', role });
-    } catch (error) {
-        console.error('CREATE_ROLE_ERROR:', error);
-        res.status(500).json({ message: 'Server error' });
+    if (!rolename || !description || !operatorId) {
+      return res.status(400).json({ message: 'Rolename, description, and operatorId are required' });
     }
-};
 
+    // Get the highest existing rolecode for this operator
+    const lastRole = await Role.findOne({ operatorId })
+      .sort({ rolecode: -1 })
+      .collation({ locale: 'en', numericOrdering: true });
+
+    // Generate next rolecode
+    let nextCode = '0001';
+    if (lastRole && lastRole.rolecode) {
+      const numericCode = parseInt(lastRole.rolecode, 10) + 1;
+      nextCode = numericCode.toString().padStart(4, '0');
+    }
+
+    const role = new Role({
+      rolecode: nextCode,
+      rolename,
+      description,
+      permissions,
+      operatorId,
+    });
+
+    await role.save();
+
+    res.status(201).json({ message: 'Role created successfully', role });
+  } catch (error) {
+    console.error('CREATE_ROLE_ERROR:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
 
 // Get all roles
 exports.getRoles = async (req, res) => {
@@ -48,33 +52,39 @@ exports.getRoles = async (req, res) => {
 };
 
 exports.searchRoles = async (req, res) => {
-    try {
-        const { keyword = '', page = 1, limit = 10 } = req.query;
-
-        const query = {
-            $or: [
-                { rolecode: { $regex: keyword, $options: 'i' } },
-                { rolename: { $regex: keyword, $options: 'i' } },
-                { description: { $regex: keyword, $options: 'i' } }
-            ]
-        };
-
-        const total = await Role.countDocuments(query);
-        const roles = await Role.find(query)
-            .populate('permissions')
-            .skip((page - 1) * limit)
-            .limit(parseInt(limit));
-
-        res.status(200).json({
-            total,
-            page: parseInt(page),
-            pageSize: roles.length,
-            roles
-        });
-    } catch (error) {
-        console.error('SEARCH_ROLES_ERROR:', error);
-        res.status(500).json({ message: 'Internal server error' });
+  try {
+    const operatorId = requestContext.getOperatorId();
+    if (!operatorId) {
+      return res.status(400).json({ message: 'Operator ID is required' });
     }
+
+    const { keyword = '', page = 1, limit = 10 } = req.query;
+
+    const query = {
+      operatorId, // restrict roles to current operator
+      $or: [
+        { rolecode: { $regex: keyword, $options: 'i' } },
+        { rolename: { $regex: keyword, $options: 'i' } },
+        { description: { $regex: keyword, $options: 'i' } }
+      ]
+    };
+
+    const total = await Role.countDocuments(query);
+    const roles = await Role.find(query)
+      .populate('permissions')
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+
+    res.status(200).json({
+      total,
+      page: parseInt(page),
+      pageSize: roles.length,
+      roles
+    });
+  } catch (error) {
+    console.error('SEARCH_ROLES_ERROR:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 };
 
 // Get a single role by ID

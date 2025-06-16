@@ -1,12 +1,12 @@
 const VehicleService = require('../services/VehicleService');
+const requestContext = require('../utils/requestContext');
 
 // GET /vehicles
 exports.getAllVehicles = async (req, res) => {
   try {
-    const operatorId = req.user.operatorId; // Assuming operatorId is available in req.user
-    if (!operatorId) {
-      return res.status(400).json({ error: 'Operator ID is required' });
-    }
+    const operatorId = req.user.operatorId;
+    if (!operatorId) return res.status(400).json({ error: 'Operator ID is required' });
+
     const result = await VehicleService.getAllVehicles(operatorId);
     res.json(result);
   } catch (err) {
@@ -18,9 +18,8 @@ exports.getAllVehicles = async (req, res) => {
 exports.searchVehicles = async (req, res) => {
   try {
     const operatorId = req.user.operatorId;
-    if (!operatorId) {
-      return res.status(400).json({ error: 'Operator ID is required' });
-    }
+    if (!operatorId) return res.status(400).json({ error: 'Operator ID is required' });
+
     const { query = "", page = 1, limit = 10 } = req.body;
     const result = await VehicleService.searchVehicles(operatorId, query, page, limit);
     res.json(result);
@@ -32,13 +31,16 @@ exports.searchVehicles = async (req, res) => {
 // POST /vehicles
 exports.createVehicle = async (req, res) => {
   try {
-    const operatorId = req.user.operatorId;
+    const operatorId = requestContext.getOperatorId(req);
+
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
+
     const vehicle = await VehicleService.createVehicle(operatorId, req.body);
     res.status(201).json(vehicle);
   } catch (err) {
+    console.error('CREATE_VEHICLE_ERROR:', err);
     res.status(400).json({ error: err.message });
   }
 };
@@ -47,13 +49,12 @@ exports.createVehicle = async (req, res) => {
 exports.updateVehicle = async (req, res) => {
   try {
     const operatorId = req.user.operatorId;
-    if (!operatorId) {
-      return res.status(400).json({ error: 'Operator ID is required' });
-    }
+    if (!operatorId) return res.status(400).json({ error: 'Operator ID is required' });
+
     const vehicle = await VehicleService.updateVehicle(operatorId, req.params.id, req.body);
     res.json(vehicle);
   } catch (err) {
-    if (err.message === 'Vehicle not found') {
+    if (err.message.includes('not found')) {
       return res.status(404).json({ error: err.message });
     }
     res.status(400).json({ error: err.message });
@@ -64,9 +65,8 @@ exports.updateVehicle = async (req, res) => {
 exports.deleteVehicle = async (req, res) => {
   try {
     const operatorId = req.user.operatorId;
-    if (!operatorId) {
-      return res.status(400).json({ error: 'Operator ID is required' });
-    }
+    if (!operatorId) return res.status(400).json({ error: 'Operator ID is required' });
+
     const result = await VehicleService.deleteVehicle(operatorId, req.params.id);
     res.json(result);
   } catch (err) {

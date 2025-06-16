@@ -18,6 +18,39 @@ exports.getAllOperators = async (req, res) => {
     }
 };
 
+exports.updateOperator = async (req, res) => {
+  try {
+    const operatorId = req.params.id;
+    const updateData = req.body;
+
+    const updatedOperator = await OperatorService.updateOperator(operatorId, updateData);
+
+    if (!updatedOperator) {
+      return res.status(404).json({ error: 'Operator not found' });
+    }
+
+    res.status(200).json(updatedOperator);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+exports.deleteOperator = async (req, res) => {
+  try {
+    const operatorId = req.params.id;
+
+    const deleted = await OperatorService.deleteOperator(operatorId);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Operator not found' });
+    }
+
+    res.status(200).json({ message: 'Operator deleted successfully' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+
 exports.searchOperators = async (req, res) => {
     try {
         const { query = "", page = 1, limit = 10 } = req.body;

@@ -1,10 +1,11 @@
 const BookingService = require('../services/BookingService');
 const logger = require('../utils/logger');
+const requestContext = require('../utils/requestContext');
 
 // Create booking
 exports.createBooking = async (req, res) => {
   try {
-    const operatorId = req.user.operatorId;
+    const operatorId = requestContext.getOperatorId();
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
@@ -22,7 +23,7 @@ exports.createBooking = async (req, res) => {
  */
 exports.getAllBookings = async (req, res) => {
   try {
-    const operatorId = req.user.operatorId;
+    const operatorId = requestContext.getOperatorId();
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
@@ -34,32 +35,10 @@ exports.getAllBookings = async (req, res) => {
   }
 };
 
-/**
- * Get unassigned bookings with pagination
- */
-exports.getUnassignedBookings = async (req, res) => {
-  try {
-    const operatorId = req.user.operatorId;
-    if (!operatorId) {
-      return res.status(400).json({ error: 'Operator ID is required' });
-    }
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    
-    const result = await BookingService.getUnassignedBookings(operatorId, page, limit);
-    res.json(result);
-  } catch (error) {
-    logger.error('Error getting unassigned bookings in controller', { error: error.message });
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-};
-
-/**
- * Get booking by ID
- */
+// Get booking by ID
 exports.getBookingById = async (req, res) => {
   try {
-    const operatorId = req.user.operatorId;
+    const operatorId = requestContext.getOperatorId();
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
@@ -77,12 +56,10 @@ exports.getBookingById = async (req, res) => {
   }
 };
 
-/**
- * Update booking by ID
- */
+// Update booking by ID
 exports.updateBooking = async (req, res) => {
   try {
-    const operatorId = req.user.operatorId;
+    const operatorId = requestContext.getOperatorId();
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
@@ -101,12 +78,10 @@ exports.updateBooking = async (req, res) => {
   }
 };
 
-/**
- * Delete booking by ID
- */
+// Delete booking by ID
 exports.deleteBooking = async (req, res) => {
   try {
-    const operatorId = req.user.operatorId;
+    const operatorId = requestContext.getOperatorId();
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
@@ -121,12 +96,91 @@ exports.deleteBooking = async (req, res) => {
   }
 };
 
-/**
- * Search bookings with filters
- */
+// Get unassigned bookings with pagination
+exports.getUnassignedBookings = async (req, res) => {
+  try {
+    const operatorId = requestContext.getOperatorId();
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+
+    const { page = 1, limit = 10, query = "" } = req.body;
+
+    const result = await BookingService.getUnassignedBookings(operatorId, page, limit, query);
+    res.json(result);
+  } catch (error) {
+    logger.error('Error getting unassigned bookings in controller', { error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// Get assigned bookings
+exports.getAssignedBookings = async (req, res) => {
+  try {
+    const operatorId = requestContext.getOperatorId();
+    const currentUserId = req.user._id;
+
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+
+    const { page = 1, limit = 10, query = "" } = req.body;
+
+    const result = await BookingService.getAssignedBookings(operatorId, currentUserId, page, limit, query);
+    res.json(result);
+  } catch (error) {
+    logger.error('Error getting assigned bookings in controller', { error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// Get in-transit bookings
+exports.getInTransitBookings = async (req, res) => {
+  try {
+    const operatorId = requestContext.getOperatorId();
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+
+    const { page = 1, limit = 10, query = "" } = req.body;
+
+    const result = await BookingService.getInTransitBookings(operatorId, page, limit, query);
+    res.json(result);
+  } catch (error) {
+    logger.error('Error getting in-transit bookings in controller', { error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// Get arrived bookings
+exports.getArrivedBookings = async (req, res) => {
+  try {
+    console.log('getArrivedBookings called');
+    const operatorId = requestContext.getOperatorId();
+    console.log('operatorId:', operatorId);
+
+    if (!operatorId) {
+      console.log('No operatorId provided');
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+
+    const { page = 1, limit = 10, query = "" } = req.body;
+    console.log({ page, limit, query });
+
+    const result = await BookingService.getArrivedBookings(operatorId, page, limit, query);
+    console.log('Result:', result);
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error getting arrived bookings:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// Search bookings with pagination
 exports.searchBookingsPost = async (req, res) => {
   try {
-    const operatorId = req.user.operatorId;
+    const operatorId = requestContext.getOperatorId();
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }

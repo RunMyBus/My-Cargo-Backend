@@ -5,9 +5,8 @@ const userController = require('../controllers/userController');
 
 router.use(passport.authenticate('jwt', { session: false }));
 
-router.use(passport.authenticate('jwt', { session: false }));
-
 // CRUD routes
+router.get('/cargo-balance/today', userController.getTodayCargoBalance);
 router.get('/', userController.getUsers);
 router.get('/:id', userController.getUserById);
 router.post('/search', userController.searchUsers);

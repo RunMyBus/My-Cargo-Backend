@@ -11,6 +11,12 @@ router.post('/create', operatorController.createOperator);
 // Get all operators
 router.get('/', operatorController.getAllOperators);
 
+// Update an operator
+router.put('/:id', operatorController.updateOperator);
+
+// Delete an operator
+router.delete('/:id', operatorController.deleteOperator);
+
 // Search operators
 router.post('/search', operatorController.searchOperators);
 
