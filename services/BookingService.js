@@ -111,6 +111,8 @@ class BookingService {
   }
 
   static async getAllBookings(operatorId) {
+    logger.info('Fetching all bookings', { operatorId });
+    
     try {
       const [bookings, totalCount] = await Promise.all([
         Booking.find({ operatorId })
@@ -128,14 +130,26 @@ class BookingService {
         createdAt: { $gte: todayStart },
       });
 
+      logger.info('Successfully fetched all bookings', { 
+        totalCount, 
+        todayCount,
+        operatorId 
+      });
+
       return { bookings, totalCount, todayCount };
     } catch (error) {
-      logger.error('Error getting all bookings', { error: error.message });
+      logger.error('Error getting all bookings', { 
+        error: error.message, 
+        operatorId,
+        stack: error.stack 
+      });
       throw error;
     }
   }
 
   static async getBookingById(id, operatorId) {
+    logger.info('Fetching booking by ID', { bookingId: id, operatorId });
+    
     try {
       const booking = await Booking.findOne({ _id: id, operatorId })
         .populate('fromOffice', '_id name')
@@ -143,66 +157,115 @@ class BookingService {
         .populate('assignedVehicle', '_id vehicleNumber');
 
       if (!booking) {
+        logger.warn('Booking not found', { bookingId: id, operatorId });
         throw new Error('Booking not found');
       }
+
+      logger.debug('Successfully fetched booking', { 
+        bookingId: id,
+        status: booking.status,
+        operatorId 
+      });
 
       return {
         ...booking.toObject(),
         senderName: booking.assignedVehicle?.vehicleNumber || "Assign vehicleNumber"
       };
     } catch (error) {
-      logger.error(`Error getting booking by id: ${id}`, { error: error.message });
+      logger.error('Error getting booking by ID', { 
+        error: error.message, 
+        bookingId: id, 
+        operatorId,
+        stack: error.stack 
+      });
       throw error;
     }
   }
 
   static async updateBooking(id, updateData, operatorId) {
+    logger.info('Updating booking', { 
+      bookingId: id, 
+      operatorId,
+      updateFields: Object.keys(updateData)
+    });
+    
     try {
       const booking = await Booking.findOneAndUpdate(
         { _id: id, operatorId },
-        updateData,
+        { ...updateData, updatedAt: new Date() },
         { new: true }
       );
+      
       if (!booking) {
+        logger.warn('Booking not found for update', { bookingId: id, operatorId });
         throw new Error('Booking not found');
       }
+      
+      logger.info('Successfully updated booking', { 
+        bookingId: id, 
+        status: booking.status,
+        operatorId 
+      });
+      
       return booking;
     } catch (error) {
-      logger.error(`Error updating booking: ${id}`, { error: error.message });
+      logger.error('Error updating booking', { 
+        error: error.message, 
+        bookingId: id, 
+        operatorId,
+        stack: error.stack 
+      });
       throw error;
     }
   }
 
   static async deleteBooking(id, operatorId) {
+    logger.info('Deleting booking', { bookingId: id, operatorId });
+    
     try {
       const booking = await Booking.findOneAndDelete({ _id: id, operatorId });
       if (!booking) {
+        logger.warn('Booking not found for deletion', { bookingId: id, operatorId });
         throw new Error('Booking not found');
       }
+      
+      logger.info('Successfully deleted booking', { bookingId: id, operatorId });
       return { message: 'Booking deleted' };
     } catch (error) {
-      logger.error(`Error deleting booking: ${id}`, { error: error.message });
+      logger.error('Error deleting booking', { 
+        error: error.message, 
+        bookingId: id, 
+        operatorId,
+        stack: error.stack 
+      });
       throw error;
     }
   }
   
   static async getUnassignedBookings(operatorId, page = 1, limit = 10, query = "") {
-  try {
-    const skip = (page - 1) * limit;
+    logger.info('Fetching unassigned bookings', { 
+      operatorId, 
+      page, 
+      limit, 
+      query: query || 'none' 
+    });
+    
+    try {
+      const skip = (page - 1) * limit;
+      const baseFilter = {
+        operatorId,
+        assignedVehicle: null,
+      };
 
-    const baseFilter = {
-      operatorId,
-      assignedVehicle: null,
-    };
-
-    if (query?.trim()) {
-      const regex = new RegExp(query.trim(), 'i');
-      baseFilter.$or = [
-        { bookingId: regex },
-        { senderName: regex },
-        { receiverName: regex },
-      ];
-    }
+      if (query?.trim()) {
+        const regex = new RegExp(query.trim(), 'i');
+        baseFilter.$or = [
+          { bookingId: regex },
+          { senderName: regex },
+          { receiverName: regex },
+        ];
+        logger.debug('Applied search filter', { filter: baseFilter.$or });
+      }
 
     const [total, rawBookings] = await Promise.all([
       Booking.countDocuments(baseFilter),
@@ -238,51 +301,82 @@ class BookingService {
       return bookingObj;
     });
 
-    return {
+    const result = {
       bookings,
       total,
       page,
       totalPages: Math.ceil(total / limit),
       count: bookings.length,
     };
+
+    logger.info('Successfully fetched unassigned bookings', { 
+      total,
+      returned: bookings.length,
+      operatorId,
+      page,
+      totalPages: result.totalPages 
+    });
+
+    return result;
   } catch (error) {
     logger.error('Error getting unassigned bookings', {
       error: error.message,
+      operatorId,
+      page,
+      limit,
+      query: query || 'none',
       stack: error.stack
     });
     throw error;
   }
 }
 
-static async getAssignedBookings(operatorId, currentUserId, page = 1, limit = 10, query = "") {
-  try {
-    const skip = (page - 1) * limit;
+  static async getAssignedBookings(operatorId, currentUserId, page = 1, limit = 10, query = "") {
+    logger.info('Fetching assigned bookings', { 
+      operatorId, 
+      currentUserId,
+      page, 
+      limit, 
+      query: query || 'none' 
+    });
+    
+    try {
+      const skip = (page - 1) * limit;
+      const baseFilter = {
+        operatorId,
+        assignedVehicle: { $ne: null },
+      };
 
-    const baseFilter = {
-      operatorId,
-      assignedVehicle: { $ne: null },
-    };
-
-    if (query?.trim()) {
-      const regex = new RegExp(query.trim(), 'i');
-      baseFilter.$or = [
-        { bookingId: regex },
-        { senderName: regex },
-        { receiverName: regex },
-      ];
-    }
+      if (query?.trim()) {
+        const regex = new RegExp(query.trim(), 'i');
+        baseFilter.$or = [
+          { bookingId: regex },
+          { senderName: regex },
+          { receiverName: regex },
+        ];
+        logger.debug('Applied search filter', { filter: baseFilter.$or });
+      }
 
     // Update all matching bookings to 'InTransit' if not already
-    await Booking.updateMany(
+    const updateResult = await Booking.updateMany(
       { ...baseFilter, status: { $ne: 'InTransit' } },
       {
         $set: {
           status: 'InTransit',
           loadedBy: currentUserId,
           updatedBy: currentUserId,
+          updatedAt: new Date()
         },
       }
     );
+    
+    if (updateResult.modifiedCount > 0) {
+      logger.info('Updated bookings status to InTransit', {
+        count: updateResult.modifiedCount,
+        operatorId,
+        updatedBy: currentUserId
+      });
+    }
 
     const [total, rawBookings] = await Promise.all([
       Booking.countDocuments(baseFilter),
@@ -313,39 +407,62 @@ static async getAssignedBookings(operatorId, currentUserId, page = 1, limit = 10
       return booking;
     });
 
-    return {
+    const result = {
       bookings,
       total,
       page,
       totalPages: Math.ceil(total / limit),
       count: bookings.length,
     };
+
+    logger.info('Successfully fetched assigned bookings', { 
+      total,
+      returned: bookings.length,
+      operatorId,
+      page,
+      totalPages: result.totalPages,
+      updatedToInTransit: updateResult?.modifiedCount || 0
+    });
+
+    return result;
   } catch (error) {
     logger.error('Error getting assigned bookings', {
       error: error.message,
-      stack: error.stack,
+      operatorId,
+      currentUserId,
+      page,
+      limit,
+      query: query || 'none',
+      stack: error.stack
     });
     throw error;
   }
 }
 
-static async getInTransitBookings(operatorId, page = 1, limit = 10, query = "") {
-  try {
-    const skip = (page - 1) * limit;
+  static async getInTransitBookings(operatorId, page = 1, limit = 10, query = "") {
+    logger.info('Fetching in-transit bookings', { 
+      operatorId, 
+      page, 
+      limit, 
+      query: query || 'none' 
+    });
+    
+    try {
+      const skip = (page - 1) * limit;
+      const baseFilter = {
+        status: 'InTransit',
+        operatorId
+      };
 
-    const baseFilter = {
-      status: 'InTransit',
-      operatorId
-    };
-
-    if (query?.trim()) {
-      const regex = new RegExp(query.trim(), 'i');
-      baseFilter.$or = [
-        { bookingId: regex },
-        { senderName: regex },
-        { receiverName: regex }
-      ];
-    }
+      if (query?.trim()) {
+        const regex = new RegExp(query.trim(), 'i');
+        baseFilter.$or = [
+          { bookingId: regex },
+          { senderName: regex },
+          { receiverName: regex }
+        ];
+        logger.debug('Applied search filter', { filter: baseFilter.$or });
+      }
 
     const [total, rawBookings] = await Promise.all([
       Booking.countDocuments(baseFilter),
@@ -383,16 +500,30 @@ static async getInTransitBookings(operatorId, page = 1, limit = 10, query = "") 
       return booking;
     });
 
-    return {
+    const result = {
       bookings,
       total,
       page,
       totalPages: Math.ceil(total / limit),
       count: bookings.length,
     };
+
+    logger.info('Successfully fetched in-transit bookings', { 
+      total,
+      returned: bookings.length,
+      operatorId,
+      page,
+      totalPages: result.totalPages 
+    });
+
+    return result;
   } catch (error) {
     logger.error('Error getting in-transit bookings', {
       error: error.message,
+      operatorId,
+      page,
+      limit,
+      query: query || 'none',
       stack: error.stack
     });
     throw error;
@@ -400,29 +531,35 @@ static async getInTransitBookings(operatorId, page = 1, limit = 10, query = "") 
 }
 
 
-static async getArrivedBookings(operatorId, page = 1, limit = 10, query = "") {
-  try {
-    const skip = (page - 1) * limit;
+  static async getArrivedBookings(operatorId, page = 1, limit = 10, query = "") {
+    logger.info('Fetching arrived bookings', { 
+      operatorId, 
+      page, 
+      limit, 
+      query: query || 'none' 
+    });
+    
+    try {
+      const skip = (page - 1) * limit;
 
-    const opId = mongoose.Types.ObjectId.isValid(operatorId)
-      ? new mongoose.Types.ObjectId(operatorId)
-      : operatorId;
+      const opId = mongoose.Types.ObjectId.isValid(operatorId)
+        ? new mongoose.Types.ObjectId(operatorId)
+        : operatorId;
 
-    const baseFilter = {
-      status: 'Arrived',
-      operatorId: opId
-    };
+      const baseFilter = {
+        status: 'Arrived',
+        operatorId: opId
+      };
 
-    if (query?.trim()) {
-      const regex = new RegExp(query.trim(), 'i');
-      baseFilter.$or = [
-        { bookingId: regex },
-        { senderName: regex },
-        { receiverName: regex }
-      ];
-    }
-
-    console.log('baseFilter:', baseFilter);
+      if (query?.trim()) {
+        const regex = new RegExp(query.trim(), 'i');
+        baseFilter.$or = [
+          { bookingId: regex },
+          { senderName: regex },
+          { receiverName: regex }
+        ];
+        logger.debug('Applied search filter', { filter: baseFilter.$or });
+      }
 
     const [total, rawBookings] = await Promise.all([
       Booking.countDocuments(baseFilter),
@@ -433,11 +570,10 @@ static async getArrivedBookings(operatorId, page = 1, limit = 10, query = "") {
         .populate('fromOffice', '_id name')
         .populate('toOffice', '_id name')
         .populate('assignedVehicle', '_id vehicleNumber')
-        // .populate('bookedBy', '_id')  <--- removed this populate
         .populate('operatorId', '_id name')
     ]);
-
-    console.log(`Found ${total} bookings`);
+    
+    logger.debug('Fetched arrived bookings', { total, limit, skip });
 
     const formattedBookings = rawBookings.map(b => {
       const booking = b.toObject();
@@ -457,20 +593,45 @@ static async getArrivedBookings(operatorId, page = 1, limit = 10, query = "") {
       return booking;
     });
 
-    return {
+    const result = {
       bookings: formattedBookings,
       total,
       page,
       totalPages: Math.ceil(total / limit),
       count: formattedBookings.length,
     };
+
+    logger.info('Successfully fetched arrived bookings', { 
+      total,
+      returned: formattedBookings.length,
+      operatorId,
+      page,
+      totalPages: result.totalPages 
+    });
+
+    return result;
   } catch (error) {
-    console.error('Error in BookingService.getArrivedBookings:', error);
+    logger.error('Error fetching arrived bookings', {
+      error: error.message,
+      operatorId,
+      page,
+      limit,
+      query: query || 'none',
+      stack: error.stack
+    });
     throw error;
   }
 }
 
   static async searchBookings({ operatorId, limit = 10, page = 1, query = "", status = "" }) {
+    logger.info('Searching bookings', { 
+      operatorId, 
+      query: query || 'none', 
+      status: status || 'all',
+      page,
+      limit
+    });
+    
     try {
       const mongoQuery = { operatorId };
 
@@ -510,14 +671,28 @@ static async getArrivedBookings(operatorId, page = 1, limit = 10, query = "") {
         return b;
       });
 
-      return {
+      const result = {
         total,
         page: parseInt(page),
         pages: Math.ceil(total / limit),
         bookings: formattedBookings,
       };
+
+      logger.debug('Booking search completed', { 
+        totalResults: total,
+        returnedResults: formattedBookings.length,
+        operatorId 
+      });
+
+      return result;
     } catch (error) {
-      logger.error('Error searching bookings', { error: error.message });
+      logger.error('Error searching bookings', { 
+        error: error.message, 
+        operatorId,
+        query,
+        status,
+        stack: error.stack 
+      });
       throw error;
     }
   }

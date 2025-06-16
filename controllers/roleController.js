@@ -1,143 +1,142 @@
-const Role = require('../models/Role');
-const Permission = require('../models/Permission');
+const RoleService = require('../services/RoleService');
 const requestContext = require('../utils/requestContext');
+const logger = require('../utils/logger');
 
+/**
+ * @route   POST /api/roles
+ * @desc    Create a new role
+ * @access  Private
+ */
 exports.createRole = async (req, res) => {
   try {
-    const { rolename, description, permissions } = req.body;
     const operatorId = requestContext.getOperatorId();
-
-    if (!rolename || !description || !operatorId) {
-      return res.status(400).json({ message: 'Rolename, description, and operatorId are required' });
-    }
-
-    // Get the highest existing rolecode for this operator
-    const lastRole = await Role.findOne({ operatorId })
-      .sort({ rolecode: -1 })
-      .collation({ locale: 'en', numericOrdering: true });
-
-    // Generate next rolecode
-    let nextCode = '0001';
-    if (lastRole && lastRole.rolecode) {
-      const numericCode = parseInt(lastRole.rolecode, 10) + 1;
-      nextCode = numericCode.toString().padStart(4, '0');
-    }
-
-    const role = new Role({
-      rolecode: nextCode,
-      rolename,
-      description,
-      permissions,
-      operatorId,
-    });
-
-    await role.save();
-
+    const role = await RoleService.createRole(req.body, operatorId);
     res.status(201).json({ message: 'Role created successfully', role });
   } catch (error) {
-    console.error('CREATE_ROLE_ERROR:', error);
+    logger.error('Error in createRole controller', {
+      error: error.message,
+      stack: error.stack,
+      body: req.body
+    });
+    
+    const statusCode = error.statusCode || 500;
+    const message = statusCode === 500 ? 'Server error' : error.message;
+    res.status(statusCode).json({ message });
+  }
+};
+
+/**
+ * @route   GET /api/roles
+ * @desc    Get all roles
+ * @access  Private
+ */
+exports.getRoles = async (req, res) => {
+  try {
+    const roles = await RoleService.getAllRoles();
+    res.status(200).json({ roles });
+  } catch (error) {
+    logger.error('Error in getRoles controller', {
+      error: error.message,
+      stack: error.stack
+    });
     res.status(500).json({ message: 'Server error' });
   }
 };
 
-// Get all roles
-exports.getRoles = async (req, res) => {
-    try {
-        const roles = await Role.find().populate('permissions');
-        res.status(200).json({ roles });
-    } catch (error) {
-        console.error('GET_ROLES_ERROR:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-};
-
+/**
+ * @route   GET /api/roles/search
+ * @desc    Search roles with pagination
+ * @access  Private
+ */
 exports.searchRoles = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId();
-    if (!operatorId) {
-      return res.status(400).json({ message: 'Operator ID is required' });
-    }
-
     const { keyword = '', page = 1, limit = 10 } = req.query;
-
-    const query = {
-      operatorId, // restrict roles to current operator
-      $or: [
-        { rolecode: { $regex: keyword, $options: 'i' } },
-        { rolename: { $regex: keyword, $options: 'i' } },
-        { description: { $regex: keyword, $options: 'i' } }
-      ]
-    };
-
-    const total = await Role.countDocuments(query);
-    const roles = await Role.find(query)
-      .populate('permissions')
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
-
-    res.status(200).json({
-      total,
+    
+    const result = await RoleService.searchRoles(operatorId, {
+      keyword,
       page: parseInt(page),
-      pageSize: roles.length,
-      roles
+      limit: parseInt(limit)
     });
+    
+    res.status(200).json(result);
   } catch (error) {
-    console.error('SEARCH_ROLES_ERROR:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    logger.error('Error in searchRoles controller', {
+      error: error.message,
+      query: req.query,
+      stack: error.stack
+    });
+    
+    const statusCode = error.statusCode || 500;
+    const message = statusCode === 500 ? 'Server error' : error.message;
+    res.status(statusCode).json({ message });
   }
 };
 
-// Get a single role by ID
+/**
+ * @route   GET /api/roles/:id
+ * @desc    Get role by ID
+ * @access  Private
+ */
 exports.getRoleById = async (req, res) => {
-    try {
-        const role = await Role.findById(req.params.id).populate('permissions');
-        if (!role) return res.status(404).json({ message: 'Role not found' });
-        res.status(200).json({ role });
-    } catch (error) {
-        console.error('GET_ROLE_ERROR:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
+  try {
+    const role = await RoleService.getRoleById(req.params.id);
+    res.status(200).json({ role });
+  } catch (error) {
+    logger.error('Error in getRoleById controller', {
+      error: error.message,
+      roleId: req.params.id,
+      stack: error.stack
+    });
+    
+    const statusCode = error.statusCode || 500;
+    const message = statusCode === 500 ? 'Server error' : error.message;
+    res.status(statusCode).json({ message });
+  }
 };
 
-// Update a role
+/**
+ * @route   PUT /api/roles/:id
+ * @desc    Update a role
+ * @access  Private
+ */
 exports.updateRole = async (req, res) => {
-
-    try {
-        if (!req.body || Object.keys(req.body).length === 0) {
-            return res.status(400).json({ message: "Missing or empty request body" });
-        }
-
-        const { rolecode, rolename, description, permissions } = req.body;
-
-        const role = await Role.findByIdAndUpdate(
-            req.params.id,
-            { rolecode, rolename, description, permissions },
-            { new: true }
-        );
-
-        if (!role) {
-            return res.status(404).json({ message: 'Role not found' });
-        }
-
-        res.status(200).json(role);
-    } catch (error) {
-        console.error('UPDATE_ROLE_ERROR:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
+  try {
+    const role = await RoleService.updateRole(req.params.id, req.body);
+    res.status(200).json(role);
+  } catch (error) {
+    logger.error('Error in updateRole controller', {
+      error: error.message,
+      roleId: req.params.id,
+      updateData: req.body,
+      stack: error.stack
+    });
+    
+    const statusCode = error.statusCode || 500;
+    const message = statusCode === 500 ? 'Server error' : error.message;
+    res.status(statusCode).json({ message });
+  }
 };
 
-
-
-// Delete a role
+/**
+ * @route   DELETE /api/roles/:id
+ * @desc    Delete a role
+ * @access  Private
+ */
 exports.deleteRole = async (req, res) => {
-    try {
-        const deleted = await Role.findByIdAndDelete(req.params.id);
-        if (!deleted) return res.status(404).json({ message: 'Role not found' });
-
-        res.status(200).json({ message: 'Role deleted successfully' });
-    } catch (error) {
-        console.error('DELETE_ROLE_ERROR:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
+  try {
+    await RoleService.deleteRole(req.params.id);
+    res.status(200).json({ message: 'Role deleted successfully' });
+  } catch (error) {
+    logger.error('Error in deleteRole controller', {
+      error: error.message,
+      roleId: req.params.id,
+      stack: error.stack
+    });
+    
+    const statusCode = error.statusCode || 500;
+    const message = statusCode === 500 ? 'Server error' : error.message;
+    res.status(statusCode).json({ message });
+  }
 };
 

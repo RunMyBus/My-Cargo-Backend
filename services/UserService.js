@@ -1,0 +1,286 @@
+const User = require('../models/User');
+const Role = require('../models/Role');
+const Branch = require('../models/Branch');
+const bcrypt = require('bcryptjs');
+const requestContext = require('../utils/requestContext');
+const getDailyCargoBalance = require('./CargoBalanceService');
+const logger = require('../utils/logger');
+
+class UserService {
+  /**
+   * Get all users for an operator
+   * @param {string} operatorId - The operator ID
+   * @returns {Promise<Array>} List of users
+   */
+  static async getUsers(operatorId) {
+    logger.info('Fetching users', { operatorId });
+    
+    if (!operatorId) {
+      logger.error('Operator ID is required for fetching users');
+      throw new Error('Operator ID is required');
+    }
+    
+    try {
+      const users = await User.find({ operatorId });
+      logger.info('Successfully fetched users', { count: users.length, operatorId });
+      return users;
+    } catch (error) {
+      logger.error('Error fetching users', { error: error.message, operatorId, stack: error.stack });
+      throw error;
+    }
+  }
+
+  /**
+   * Get user by ID
+   * @param {string} id - User ID
+   * @returns {Promise<Object>} User details
+   */
+  static async getUserById(id) {
+    logger.info('Fetching user by ID', { userId: id });
+    
+    try {
+      const user = await User.findById(id).populate('role');
+      if (!user) {
+        logger.warn('User not found', { userId: id });
+        throw new Error('User not found');
+      }
+      logger.debug('Successfully fetched user', { userId: id, role: user.role?.name });
+      return user;
+    } catch (error) {
+      logger.error('Error fetching user by ID', { error: error.message, userId: id, stack: error.stack });
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new user
+   * @param {Object} userData - User data
+   * @returns {Promise<Object>} Created user
+   */
+  static async createUser(userData) {
+    const { mobile, password, role, branchId, operatorId } = userData;
+    logger.info('Creating new user', { mobile, role, operatorId });
+
+    try {
+      // Check if mobile number exists
+      const existingUser = await User.findOne({ mobile });
+      if (existingUser) {
+        logger.warn('Mobile number already exists', { mobile });
+        throw new Error('Mobile number already exists');
+      }
+
+      // Validate role
+      const roleExists = await Role.findById(role);
+      if (!roleExists) {
+        logger.warn('Invalid role ID provided', { role });
+        throw new Error('Invalid role ID');
+      }
+
+      // Validate branch if provided
+      if (branchId) {
+        const branchExists = await Branch.findById(branchId);
+        if (!branchExists) {
+          logger.warn('Invalid branch ID provided', { branchId });
+          throw new Error('Invalid branch ID');
+        }
+      }
+
+      // Format status
+      const status = userData.status?.charAt(0).toUpperCase() + 
+                    (userData.status?.slice(1).toLowerCase() || '');
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Create user
+      const newUser = new User({
+        ...userData,
+        password: hashedPassword,
+        status: status || 'Active',
+        operatorId,
+        cargoBalance: 0,
+      });
+
+      const savedUser = await newUser.save();
+      const userResponse = savedUser.toObject();
+      delete userResponse.password;
+
+      logger.info('User created successfully', { userId: savedUser._id, mobile });
+      return userResponse;
+    } catch (error) {
+      logger.error('Error creating user', { 
+        error: error.message, 
+        mobile, 
+        operatorId,
+        stack: error.stack 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Update user
+   * @param {string} id - User ID
+   * @param {Object} updateData - Data to update
+   * @returns {Promise<Object>} Updated user
+   */
+  static async updateUser(id, updateData) {
+    logger.info('Updating user', { userId: id, updateFields: Object.keys(updateData) });
+    
+    try {
+      const { password, role } = updateData;
+      const updateObj = { ...updateData };
+
+      // Hash new password if provided
+      if (password) {
+        updateObj.password = await bcrypt.hash(password, 10);
+        logger.debug('Password hashed for user update', { userId: id });
+      }
+
+      // Validate role if being updated
+      if (role) {
+        const roleExists = await Role.findById(role);
+        if (!roleExists) {
+          logger.warn('Invalid role ID provided during update', { role });
+          throw new Error('Invalid role ID');
+        }
+      }
+
+      const updatedUser = await User.findByIdAndUpdate(id, updateObj, {
+        new: true,
+      });
+
+      if (!updatedUser) {
+        logger.warn('User not found for update', { userId: id });
+        throw new Error('User not found');
+      }
+
+      logger.info('User updated successfully', { userId: id });
+      return updatedUser;
+    } catch (error) {
+      logger.error('Error updating user', { 
+        error: error.message, 
+        userId: id, 
+        stack: error.stack 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Delete user
+   * @param {string} id - User ID
+   * @returns {Promise<Object>} Deletion result
+   */
+  static async deleteUser(id) {
+    logger.info('Deleting user', { userId: id });
+    
+    try {
+      const result = await User.findByIdAndDelete(id);
+      if (!result) {
+        logger.warn('User not found for deletion', { userId: id });
+        throw new Error('User not found');
+      }
+      logger.info('User deleted successfully', { userId: id });
+      return { success: true };
+    } catch (error) {
+      logger.error('Error deleting user', { 
+        error: error.message, 
+        userId: id, 
+        stack: error.stack 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Search users with pagination
+   * @param {Object} options - Search options
+   * @param {string} options.query - Search query
+   * @param {number} options.page - Page number
+   * @param {number} options.limit - Items per page
+   * @param {string} options.operatorId - Operator ID
+   * @returns {Promise<Object>} Search results
+   */
+  static async searchUsers({ query = "", page = 1, limit = 10, operatorId }) {
+    logger.info('Searching users', { query, page, limit, operatorId });
+    
+    if (!operatorId) {
+      logger.error('Operator ID is required for user search');
+      throw new Error('Operator ID is required');
+    }
+
+    try {
+      const regex = new RegExp(query, "i");
+      const skip = (page - 1) * limit;
+      const queryObj = query ? { fullName: regex } : {};
+      const baseQuery = { operatorId, ...queryObj };
+      
+      const [total, users] = await Promise.all([
+        User.countDocuments(baseQuery),
+        User.find(baseQuery)
+          .populate("role")
+          .populate("operatorId", "_id name")
+          .populate("branchId", "_id name")
+          .skip(skip)
+          .limit(Number(limit))
+      ]);
+
+      logger.debug('User search completed', { 
+        total, 
+        page, 
+        totalPages: Math.ceil(total / limit),
+        resultCount: users.length 
+      });
+
+      return {
+        data: users,
+        total,
+        page: Number(page),
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (error) {
+      logger.error('Error searching users', { 
+        error: error.message, 
+        query, 
+        operatorId,
+        stack: error.stack 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get today's cargo balance for a user
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} Cargo balance
+   */
+  static async getTodayCargoBalance(userId) {
+    logger.info('Fetching today\'s cargo balance', { userId });
+    
+    try {
+      const balance = await getDailyCargoBalance(userId);
+      const result = {
+        date: new Date().toISOString().slice(0, 10),
+        balance
+      };
+      
+      logger.debug('Successfully fetched cargo balance', { 
+        userId, 
+        balance: result.balance,
+        date: result.date 
+      });
+      
+      return result;
+    } catch (error) {
+      logger.error('Error getting cargo balance', { 
+        error: error.message, 
+        userId,
+        stack: error.stack 
+      });
+      throw new Error('Unable to calculate cargo balance');
+    }
+  }
+}
+
+module.exports = UserService;

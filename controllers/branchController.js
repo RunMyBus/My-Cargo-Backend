@@ -1,6 +1,6 @@
 const Branch = require('../models/Branch');
 const requestContext = require('../utils/requestContext');
-
+const logger = require('../utils/logger');
 exports.createBranch = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId(req);
@@ -27,7 +27,7 @@ exports.createBranch = async (req, res) => {
 
     res.status(201).json({ message: 'Branch created successfully', branch });
   } catch (error) {
-    console.error('CREATE_BRANCH_ERROR:', error);
+    logger.error('CREATE_BRANCH_ERROR:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -52,7 +52,7 @@ exports.getBranches = async (req, res) => {
       total,
     });
   } catch (error) {
-    console.error('GET_BRANCHES_ERROR:', error);
+    logger.error('GET_BRANCHES_ERROR:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -65,7 +65,7 @@ exports.getBranchById = async (req, res) => {
     
     res.status(200).json(branch);
   } catch (error) {
-    console.error('GET_BRANCH_ERROR:', error);
+    logger.error('GET_BRANCH_ERROR:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -74,7 +74,6 @@ exports.getBranchById = async (req, res) => {
 exports.updateBranch = async (req, res) => {
   try {
     const { name, address, phone, manager, status } = req.body;
-
     const branch = await Branch.findByIdAndUpdate(
       req.params.id,
       { name, address, phone, manager, status },
@@ -85,7 +84,7 @@ exports.updateBranch = async (req, res) => {
 
     res.status(200).json(branch);
   } catch (error) {
-    console.error('UPDATE_BRANCH_ERROR:', error);
+    logger.error('UPDATE_BRANCH_ERROR:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -97,7 +96,7 @@ exports.deleteBranch = async (req, res) => {
     if (!branch) return res.status(404).json({ message: 'Branch not found' });
     res.status(200).json({ message: 'Branch deleted successfully' });
   } catch (error) {
-    console.error('DELETE_BRANCH_ERROR:', error);
+    logger.error('DELETE_BRANCH_ERROR:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -135,7 +134,7 @@ exports.searchBranches = async (req, res) => {
       data: branches,
     });
   } catch (error) {
-    console.error("SEARCH_BRANCHES_ERROR:", error);
+    logger.error("SEARCH_BRANCHES_ERROR:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
