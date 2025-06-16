@@ -1,0 +1,18 @@
+{
+  "senderName": "John Doe",
+  "senderPhone": "+1234567890",
+  "senderEmail": "john@example.com",
+  "senderAddress": "123 Sender Lane, City A",
+  "receiverName": "Jane Smith",
+  "receiverPhone": "+0987654321",
+  "receiverEmail": "jane@example.com",
+  "receiverAddress": "456 Receiver Road, City B",
+  "fromOffice": "684683d43221187f33319d54",
+  "toOffice": "684683e43221187f33319d56",
+  "packageDescription": "Electronics and Gadgets",
+  "weight": 12.5,
+  "dimensions": "40x30x20 cm",
+  "totalAmount": 2500,
+  "status": "Booked",
+  "type": "Paid"
+}

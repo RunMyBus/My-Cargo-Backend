@@ -1,15 +1,18 @@
-// config should be imported before importing any other file
 require('dotenv').config();
-config = process.env;
+const config = process.env;
+
 const app = require('./config/express');
 require('./database/mongoose');
 const logger = require('./utils/logger');
+const passport = require('passport');
+const { instance: requestContext } = require('./utils/requestContext'); // import request context
 
-// Configure error handling
-app.use((err, req, res, next) => {
-    logger.error(err.stack);
-    res.status(500).json({ error: 'Something went wrong!' });
-});
+// Passport middleware (assuming it sets req.user)
+app.use(passport.initialize());
+app.use(passport.session && passport.session()); // if using sessions
+
+// Request context middleware — must be after passport middleware!
+app.use(requestContext.middleware());
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -17,14 +20,17 @@ app.use((req, res, next) => {
     next();
 });
 
+// Error handling middleware (should be after all other middlewares and routes)
+app.use((err, req, res, next) => {
+    logger.error(err.stack);
+    res.status(500).json({ error: 'Something went wrong!' });
+});
 
-// module.parent check is required to support mocha watch
+// Start the server only if not in test mode
 if (!module.parent) {
     app.listen(config.APP_RUNNING_PORT, () => {
-    logger.info(`server started on port ${config.APP_RUNNING_PORT} (${config.NODE_ENV})`);
+        logger.info(`server started on port ${config.APP_RUNNING_PORT} (${config.NODE_ENV})`);
     });
 }
-
-
 
 module.exports = app;

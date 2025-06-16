@@ -11,13 +11,13 @@ jest.mock('mongoose');
 const mockFromBranch = {
   _id: '60d21b4667d0d8992e610c88',
   name: 'Origin Branch',
-  status: 'active'
+  status: 'Active'
 };
 
 const mockToBranch = {
   _id: '60d21b4667d0d8992e610c89',
   name: 'Destination Branch',
-  status: 'active'
+  status: 'Active'
 };
 
 // Mock the Operator model

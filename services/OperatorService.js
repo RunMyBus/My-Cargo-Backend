@@ -23,6 +23,54 @@ class OperatorService {
         return await Operator.find();
     }
 
+     /**
+     * Update operator by ID
+     * @param {String} operatorId - Operator's MongoDB ObjectId
+     * @param {Object} updateData - Fields to update
+     * @returns {Object|null}
+     */
+    static async updateOperator(operatorId, updateData) {
+        try {
+            const updatedOperator = await Operator.findByIdAndUpdate(
+                operatorId,
+                updateData,
+                { new: true, runValidators: true }
+            );
+
+            if (!updatedOperator) {
+                logger.warn(`Operator not found: ${operatorId}`);
+                return null;
+            }
+
+            return updatedOperator;
+        } catch (error) {
+            logger.error(`Error updating operator: ${error.message}`);
+            throw new Error('Failed to update operator');
+        }
+    }
+
+    /**
+ * Delete operator by ID
+ * @param {String} operatorId - Operator's MongoDB ObjectId
+ * @returns {Object|null}
+ */
+static async deleteOperator(operatorId) {
+    try {
+        const deletedOperator = await Operator.findByIdAndDelete(operatorId);
+
+        if (!deletedOperator) {
+            logger.warn(`Operator not found for deletion: ${operatorId}`);
+            return null;
+        }
+
+        logger.info(`Operator deleted: ${deletedOperator._id}`);
+        return deletedOperator;
+    } catch (error) {
+        logger.error(`Error deleting operator: ${error.message}`);
+        throw new Error('Failed to delete operator');
+    }
+}
+
     static async searchOperators(query = "", page = 1, limit = 10) {
         const regex = new RegExp(query, "i");
         const skip = (page - 1) * limit;

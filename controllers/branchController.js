@@ -1,31 +1,51 @@
-const Branch = require('../models/Branch'); // adjust path as needed
+const Branch = require('../models/Branch');
+const requestContext = require('../utils/requestContext');
 
-// Create a new branch
 exports.createBranch = async (req, res) => {
   try {
+    const operatorId = requestContext.getOperatorId(req);
+    if (!operatorId) {
+      return res.status(400).json({ message: 'Operator ID is required' });
+    }
+
     const { name, address, phone, manager, status } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ message: 'Branch name is required' });
+    }
 
     const branch = new Branch({
       name,
       address,
       phone,
       manager,
-      status: status?.toLowerCase() || 'active'
+      status,
+      operatorId,
     });
 
     await branch.save();
-    res.status(201).json(branch);
+
+    res.status(201).json({ message: 'Branch created successfully', branch });
   } catch (error) {
     console.error('CREATE_BRANCH_ERROR:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
 // Get all branches
 exports.getBranches = async (req, res) => {
   try {
-    const branches = await Branch.find();
-    const total = await Branch.countDocuments();
+    const operatorId = requestContext.getOperatorId();
+
+    if (!operatorId) {
+      return res.status(400).json({ message: 'Operator ID is required' });
+    }
+
+    // Count all branches for operator (all statuses)
+    const total = await Branch.countDocuments({ operatorId });
+
+    // Get only active branches for operator
+    const branches = await Branch.find({ operatorId, status: "Active" });
 
     res.status(200).json({
       data: branches,
@@ -86,10 +106,15 @@ exports.deleteBranch = async (req, res) => {
 // Search branches with pagination and name query
 exports.searchBranches = async (req, res) => {
   try {
+    const operatorId = requestContext.getOperatorId();
+    if (!operatorId) {
+      return res.status(400).json({ message: 'Operator ID is required' });
+    }
+
     const { query = "", limit = 10, page = 1 } = req.body;
 
-    // Build case-insensitive regex search for the name field
     const searchCondition = {
+      operatorId, // Filter by current operator
       name: { $regex: query, $options: "i" },
     };
 
