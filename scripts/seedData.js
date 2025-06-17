@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 
 // Load environment variables
 dotenv.config();
+const config = process.env;
 
 // Models
 const Operator = require('../models/Operator');
@@ -17,7 +18,8 @@ const Booking = require('../models/Booking');
 // Connect to MongoDB
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI, {
+    let mongoUrl = 'mongodb://' + config.DB_HOST + ':' + config.DB_PORT + '/' + config.DB_NAME;
+    await mongoose.connect(mongoUrl, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
@@ -222,9 +224,15 @@ const seedData = async () => {
     console.log(`Created ${createdVehicles.length} vehicles`);
 
     // 7. Create Bookings
+    // Helper function to generate booking dates
+    const generateBookingDate = (daysAgo) => {
+      return new Date(Date.now() - (daysAgo * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+    };
+
     const bookingTemplates = [
       // Initial bookings
       {
+        bookingDate: generateBookingDate(2),
         senderName: 'Amit Shah',
         senderPhone: '9876543220',
         senderEmail: 'amit.shah@example.com',
@@ -233,8 +241,8 @@ const seedData = async () => {
         receiverPhone: '9876543221',
         receiverEmail: 'neha.gupta@example.com',
         receiverAddress: '45, Connaught Place, New Delhi',
-        fromOffice: 0,  // Mumbai
-        toOffice: 1,    // Delhi
+        fromOffice: createdBranches[0]._id,  // Mumbai
+        toOffice: createdBranches[1]._id,    // Delhi
         packageDescription: 'Electronics',
         weight: 10,
         quantity: 2,
@@ -242,9 +250,10 @@ const seedData = async () => {
         dimensions: '20x15x10 cm',
         status: 'Booked',
         lrType: 'Paid',
-        bookedBy: 1,  // Mumbai Manager
+        bookedBy: createdUsers[1]._id,  // Mumbai Manager
       },
       {
+        bookingDate: generateBookingDate(2),
         senderName: 'Rahul Verma',
         senderPhone: '9876543222',
         senderEmail: 'rahul.v@example.com',
@@ -253,8 +262,8 @@ const seedData = async () => {
         receiverPhone: '9876543223',
         receiverEmail: 'priya.n@example.com',
         receiverAddress: '33, MG Road, Bangalore',
-        fromOffice: 1,  // Delhi
-        toOffice: 2,    // Bangalore
+        fromOffice: createdBranches[1]._id,  // Delhi
+        toOffice: createdBranches[2]._id,    // Bangalore
         packageDescription: 'Clothing',
         weight: 5,
         quantity: 3,
@@ -262,11 +271,12 @@ const seedData = async () => {
         dimensions: '30x20x15 cm',
         status: 'InTransit',
         lrType: 'ToPay',
-        bookedBy: 2,  // Delhi Manager
-        assignedVehicle: 2,  // KA01EF9012
+        bookedBy: createdUsers[2]._id,  // Delhi Manager
+        assignedVehicle: createdVehicles[2]._id,  // KA01EF9012
       },
       // 20 more diverse bookings
       {
+        bookingDate: generateBookingDate(1),
         senderName: 'Vikram Mehta',
         senderPhone: '9876543230',
         senderEmail: 'vikram.m@example.com',
@@ -275,8 +285,8 @@ const seedData = async () => {
         receiverPhone: '9876543231',
         receiverEmail: 'anjali.k@example.com',
         receiverAddress: '78, Rajouri Garden, Delhi',
-        fromOffice: 0,  // Mumbai
-        toOffice: 1,    // Delhi
+        fromOffice: createdBranches[0]._id,  // Mumbai
+        toOffice: createdBranches[1]._id,    // Delhi
         packageDescription: 'Documents',
         weight: 0.5,
         quantity: 1,
@@ -284,12 +294,13 @@ const seedData = async () => {
         dimensions: '30x20x2 cm',
         status: 'Delivered',
         lrType: 'Paid',
-        bookedBy: 1,  // Mumbai Manager
-        assignedVehicle: 0,  // MH01AB1234
-        deliveredBy: 1,
+        bookedBy: createdUsers[1]._id,  // Mumbai Manager
+        assignedVehicle: createdVehicles[0]._id,  // MH01AB1234
+        deliveredBy: createdUsers[1]._id,  // Delhi Manager
         deliveryDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
       },
       {
+        bookingDate: generateBookingDate(1),
         senderName: 'Rajesh Khanna',
         senderPhone: '9876543232',
         senderEmail: 'rajesh.k@example.com',
@@ -298,8 +309,8 @@ const seedData = async () => {
         receiverPhone: '9876543233',
         receiverEmail: 'meena.d@example.com',
         receiverAddress: '34, Karol Bagh, Delhi',
-        fromOffice: 0,  // Mumbai
-        toOffice: 1,    // Delhi
+        fromOffice: createdBranches[0]._id,  // Mumbai
+        toOffice: createdBranches[1]._id,    // Delhi
         packageDescription: 'Jewelry',
         weight: 0.2,
         quantity: 1,
@@ -307,9 +318,10 @@ const seedData = async () => {
         dimensions: '10x5x3 cm',
         status: 'Booked',
         lrType: 'Paid',
-        bookedBy: 1,  // Mumbai Manager
+        bookedBy: createdUsers[1]._id,  // Mumbai Manager
       },
       {
+        bookingDate: generateBookingDate(1),
         senderName: 'Priyanka Sharma',
         senderPhone: '9876543234',
         senderEmail: 'priyanka.s@example.com',
@@ -318,8 +330,8 @@ const seedData = async () => {
         receiverPhone: '9876543235',
         receiverEmail: 'rahul.m@example.com',
         receiverAddress: '67, Saket, Delhi',
-        fromOffice: 0,  // Mumbai
-        toOffice: 1,    // Delhi
+        fromOffice: createdBranches[0]._id,  // Mumbai
+        toOffice: createdBranches[1]._id,    // Delhi
         packageDescription: 'Gifts',
         weight: 3,
         quantity: 5,
@@ -327,10 +339,11 @@ const seedData = async () => {
         dimensions: '25x20x15 cm',
         status: 'InTransit',
         lrType: 'ToPay',
-        bookedBy: 1,  // Mumbai Manager
-        assignedVehicle: 0,  // MH01AB1234
+        bookedBy: createdUsers[1]._id,  // Mumbai Manager
+        assignedVehicle: createdVehicles[0]._id,  // MH01AB1234
       },
       {
+        bookingDate: generateBookingDate(0),
         senderName: 'Arun Joshi',
         senderPhone: '9876543236',
         senderEmail: 'arun.j@example.com',
@@ -339,8 +352,8 @@ const seedData = async () => {
         receiverPhone: '9876543237',
         receiverEmail: 'kavita.r@example.com',
         receiverAddress: '23, Indiranagar, Bangalore',
-        fromOffice: 0,  // Mumbai
-        toOffice: 2,    // Bangalore
+        fromOffice: createdBranches[0]._id,  // Mumbai
+        toOffice: createdBranches[2]._id,    // Bangalore
         packageDescription: 'Electronics',
         weight: 8,
         quantity: 1,
@@ -348,11 +361,12 @@ const seedData = async () => {
         dimensions: '40x30x20 cm',
         status: 'Arrived',
         lrType: 'Paid',
-        bookedBy: 1,  // Mumbai Manager
-        assignedVehicle: 2,  // KA01EF9012
+        bookedBy: createdUsers[1]._id,  // Mumbai Manager
+        assignedVehicle: createdVehicles[2]._id,  // KA01EF9012
         arrivalDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
       },
       {
+        bookingDate: generateBookingDate(0),
         senderName: 'Sanjay Patel',
         senderPhone: '9876543238',
         senderEmail: 'sanjay.p@example.com',
@@ -361,8 +375,8 @@ const seedData = async () => {
         receiverPhone: '9876543239',
         receiverEmail: 'anita.d@example.com',
         receiverAddress: '12, Whitefield, Bangalore',
-        fromOffice: 0,  // Mumbai
-        toOffice: 2,    // Bangalore
+        fromOffice: createdBranches[0]._id,  // Mumbai
+        toOffice: createdBranches[2]._id,    // Bangalore
         packageDescription: 'Clothing',
         weight: 6,
         quantity: 4,
@@ -370,10 +384,11 @@ const seedData = async () => {
         dimensions: '35x25x15 cm',
         status: 'Cancelled',
         lrType: 'Paid',
-        bookedBy: 1,  // Mumbai Manager
+        bookedBy: createdUsers[1]._id,  // Mumbai Manager
         cancellationReason: 'Customer requested cancellation',
       },
       {
+        bookingDate: generateBookingDate(0),
         senderName: 'Neha Kapoor',
         senderPhone: '9876543240',
         senderEmail: 'neha.k@example.com',
@@ -382,8 +397,8 @@ const seedData = async () => {
         receiverPhone: '9876543241',
         receiverEmail: 'ravi.s@example.com',
         receiverAddress: '56, Juhu, Mumbai',
-        fromOffice: 1,  // Delhi
-        toOffice: 0,    // Mumbai
+        fromOffice: createdBranches[1]._id,  // Delhi
+        toOffice: createdBranches[0]._id,    // Mumbai
         packageDescription: 'Documents',
         weight: 0.3,
         quantity: 1,
@@ -391,12 +406,13 @@ const seedData = async () => {
         dimensions: '25x15x1 cm',
         status: 'Delivered',
         lrType: 'Paid',
-        bookedBy: 2,  // Delhi Manager
-        assignedVehicle: 0,  // MH01AB1234
-        deliveredBy: 1,
+        bookedBy: createdUsers[2]._id,  // Delhi Manager
+        assignedVehicle: createdVehicles[0]._id,  // MH01AB1234
+        deliveredBy: createdUsers[1]._id,
         deliveryDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
       },
       {
+        bookingDate: generateBookingDate(2),
         senderName: 'Rakesh Malhotra',
         senderPhone: '9876543242',
         senderEmail: 'rakesh.m@example.com',
@@ -405,8 +421,8 @@ const seedData = async () => {
         receiverPhone: '9876543243',
         receiverEmail: 'sunita.i@example.com',
         receiverAddress: '89, Electronic City, Bangalore',
-        fromOffice: 1,  // Delhi
-        toOffice: 2,    // Bangalore
+        fromOffice: createdBranches[1]._id,  // Delhi
+        toOffice: createdBranches[2]._id,    // Bangalore
         packageDescription: 'Electronics',
         weight: 12,
         quantity: 1,
@@ -414,10 +430,11 @@ const seedData = async () => {
         dimensions: '50x40x30 cm',
         status: 'InTransit',
         lrType: 'ToPay',
-        bookedBy: 2,  // Delhi Manager
-        assignedVehicle: 2,  // KA01EF9012
+        bookedBy: createdUsers[2]._id,  // Delhi Manager
+        assignedVehicle: createdVehicles[2]._id,  // KA01EF9012
       },
       {
+        bookingDate: generateBookingDate(1),
         senderName: 'Manoj Kumar',
         senderPhone: '9876543244',
         senderEmail: 'manoj.k@example.com',
@@ -426,8 +443,8 @@ const seedData = async () => {
         receiverPhone: '9876543245',
         receiverEmail: 'pooja.s@example.com',
         receiverAddress: '45, Andheri East, Mumbai',
-        fromOffice: 1,  // Delhi
-        toOffice: 0,    // Mumbai
+        fromOffice: createdBranches[1]._id,  // Delhi
+        toOffice: createdBranches[0]._id,    // Mumbai
         packageDescription: 'Gifts',
         weight: 4,
         quantity: 3,
@@ -435,9 +452,10 @@ const seedData = async () => {
         dimensions: '30x20x15 cm',
         status: 'Booked',
         lrType: 'Paid',
-        bookedBy: 2,  // Delhi Manager
+        bookedBy: createdUsers[2]._id,  // Delhi Manager
       },
       {
+        bookingDate: generateBookingDate(2),
         senderName: 'Anil Kapoor',
         senderPhone: '9876543246',
         senderEmail: 'anil.k@example.com',
@@ -446,8 +464,8 @@ const seedData = async () => {
         receiverPhone: '9876543247',
         receiverEmail: 'rekha.v@example.com',
         receiverAddress: '78, Malad West, Mumbai',
-        fromOffice: 2,  // Bangalore
-        toOffice: 0,    // Mumbai
+        fromOffice: createdBranches[2]._id,  // Bangalore
+        toOffice: createdBranches[0]._id,    // Mumbai
         packageDescription: 'Clothing',
         weight: 7,
         quantity: 5,
@@ -455,10 +473,11 @@ const seedData = async () => {
         dimensions: '35x25x20 cm',
         status: 'InTransit',
         lrType: 'ToPay',
-        bookedBy: 3,  // Mumbai Staff
-        assignedVehicle: 0,  // MH01AB1234
+        bookedBy: createdUsers[3]._id,  // Mumbai Staff
+        assignedVehicle: createdVehicles[0]._id,  // MH01AB1234
       },
       {
+        bookingDate: generateBookingDate(1),
         senderName: 'Suresh Reddy',
         senderPhone: '9876543248',
         senderEmail: 'suresh.r@example.com',
@@ -467,8 +486,8 @@ const seedData = async () => {
         receiverPhone: '9876543249',
         receiverEmail: 'anand.d@example.com',
         receiverAddress: '12, Connaught Place, Delhi',
-        fromOffice: 2,  // Bangalore
-        toOffice: 1,    // Delhi
+        fromOffice: createdBranches[2]._id,  // Bangalore
+        toOffice: createdBranches[1]._id,    // Delhi
         packageDescription: 'Electronics',
         weight: 15,
         quantity: 2,
@@ -476,9 +495,10 @@ const seedData = async () => {
         dimensions: '60x40x30 cm',
         status: 'Booked',
         lrType: 'Paid',
-        bookedBy: 3,  // Mumbai Staff
+        bookedBy: createdUsers[3]._id,  // Mumbai Staff
       },
       {
+        bookingDate: generateBookingDate(0),
         senderName: 'Priya Singh',
         senderPhone: '9876543250',
         senderEmail: 'priya.s@example.com',
@@ -487,8 +507,8 @@ const seedData = async () => {
         receiverPhone: '9876543251',
         receiverEmail: 'rahul.k@example.com',
         receiverAddress: '45, Saket, Delhi',
-        fromOffice: 2,  // Bangalore
-        toOffice: 1,    // Delhi
+        fromOffice: createdBranches[2]._id,  // Bangalore
+        toOffice: createdBranches[1]._id,    // Delhi
         packageDescription: 'Gadgets',
         weight: 3,
         quantity: 2,
@@ -496,11 +516,12 @@ const seedData = async () => {
         dimensions: '25x15x10 cm',
         status: 'Arrived',
         lrType: 'Paid',
-        bookedBy: 3,  // Mumbai Staff
-        assignedVehicle: 1,  // DL01CD5678
+        bookedBy: createdUsers[3]._id,  // Mumbai Staff
+        assignedVehicle: createdVehicles[1]._id,  // DL01CD5678
         arrivalDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
       },
       {
+        bookingDate: generateBookingDate(2),
         senderName: 'Vijay Kumar',
         senderPhone: '9876543252',
         senderEmail: 'vijay.k@example.com',
@@ -509,8 +530,8 @@ const seedData = async () => {
         receiverPhone: '9876543253',
         receiverEmail: 'sunita.p@example.com',
         receiverAddress: '67, Andheri East, Mumbai',
-        fromOffice: 2,  // Bangalore
-        toOffice: 0,    // Mumbai
+        fromOffice: createdBranches[2]._id,  // Bangalore
+        toOffice: createdBranches[0]._id,    // Mumbai
         packageDescription: 'Clothing',
         weight: 8,
         quantity: 6,
@@ -518,9 +539,9 @@ const seedData = async () => {
         dimensions: '40x30x20 cm',
         status: 'Delivered',
         lrType: 'ToPay',
-        bookedBy: 3,  // Mumbai Staff
-        assignedVehicle: 0,  // MH01AB1234
-        deliveredBy: 1,
+        bookedBy: createdUsers[3]._id,  // Mumbai Staff
+        assignedVehicle: createdVehicles[0]._id,  // MH01AB1234
+        deliveredBy: createdUsers[1]._id,  // Mumbai Staff
         deliveryDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
       },
       // Add more bookings as needed...
@@ -556,16 +577,18 @@ const seedData = async () => {
       const bookingDate = new Date(booking.bookingDate);
       const bookingId = `BK${bookingDate.getFullYear().toString().slice(-2)}${(bookingDate.getMonth() + 1).toString().padStart(2, '0')}${String(index).padStart(4, '0')}`;
 
+      console.log(`Booking ID: ${bookingId}`);
       return {
         ...booking,
+        operatorId: operator._id,
         bookingId,
         freightCharge: finalFreightCharge,
         loadingCharge: booking.status === 'Cancelled' ? loadingCharge : loadingCharge,
         unloadingCharge: booking.status === 'Cancelled' ? Math.round(unloadingCharge * 0.5) : unloadingCharge,
         insuranceCharge,
         totalAmountCharge: finalTotalCharge,
-        createdAt: new Date(booking.bookingDate),
-        updatedAt: new Date(booking.deliveryDate || booking.arrivalDate || booking.bookingDate)
+        createdAt: booking.bookingDate,
+        updatedAt: booking.deliveryDate || booking.arrivalDate || booking.bookingDate
       };
     });
 
