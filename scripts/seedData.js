@@ -77,6 +77,7 @@ const seedData = async () => {
       phone: '+911234567890',
       status: 'Active',
       bookingSequence: 1000,
+      paymentOptions: ['cash', 'UPI'],
     });
     console.log(`Created operator: ${operator.name}`);
 
