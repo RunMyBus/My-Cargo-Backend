@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   token: { type: String },
   branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
-  cargoBalance: { type: Number, default: 0 }, // Cargo balance  
+  cargoBalance: { type: Number, default: 0 },
   status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
   role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },
   operatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Operator', required: true },

@@ -40,7 +40,7 @@ exports.createVehicle = async (req, res) => {
     const vehicle = await VehicleService.createVehicle(operatorId, req.body);
     res.status(201).json(vehicle);
   } catch (err) {
-    console.error('CREATE_VEHICLE_ERROR:', err);
+    logger.error('CREATE_VEHICLE_ERROR:', err);
     res.status(400).json({ error: err.message });
   }
 };

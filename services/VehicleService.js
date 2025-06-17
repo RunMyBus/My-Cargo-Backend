@@ -4,13 +4,12 @@ const Operator = require('../models/Operator');
 
 class VehicleService {
  static async getAllVehicles(operatorId) {
-  const vehicles = await Vehicle.find({ operatorId, status: 'Available' }).lean();
-  
-  // Count all vehicles regardless of status
-  const total = await Vehicle.countDocuments({ operatorId });
-  
-  // Count vehicles with status 'Available'
-  const availableCount = await Vehicle.countDocuments({ operatorId, status: 'Available' });
+  const availableFilter = { operatorId, status: 'Available' };
+  const allFilter = { operatorId };
+
+  const vehicles = await Vehicle.find(availableFilter).lean();
+  const total = await Vehicle.countDocuments(allFilter); // all vehicles
+  const availableCount = await Vehicle.countDocuments(availableFilter); // available only
 
   return {
     data: vehicles,
@@ -18,7 +17,6 @@ class VehicleService {
     availableCount,
   };
 }
-
 
   static async searchVehicles(operatorId, query = "", page = 1, limit = 10) {
     const regex = new RegExp(query, "i");

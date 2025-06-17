@@ -1,6 +1,7 @@
 const Branch = require('../models/Branch');
-const requestContext = require('../utils/requestContext');
 const logger = require('../utils/logger');
+const requestContext = require('../utils/requestContext');
+
 exports.createBranch = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId(req);
@@ -41,15 +42,22 @@ exports.getBranches = async (req, res) => {
       return res.status(400).json({ message: 'Operator ID is required' });
     }
 
-    // Count all branches for operator (all statuses)
-    const total = await Branch.countDocuments({ operatorId });
+    // Count all branches (regardless of status)
+    const totalCount = await Branch.countDocuments({ operatorId });
 
-    // Get only active branches for operator
+    // Count only active branches
+    const activeCount = await Branch.countDocuments({ operatorId, status: "Active" });
+
+    // Get all active branches to return in data
     const branches = await Branch.find({ operatorId, status: "Active" });
 
     res.status(200).json({
       data: branches,
-      total,
+      counts: {
+        total: totalCount,
+        active: activeCount,
+        inactive: totalCount - activeCount,
+      },
     });
   } catch (error) {
     logger.error('GET_BRANCHES_ERROR:', error);

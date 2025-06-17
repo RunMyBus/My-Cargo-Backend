@@ -1,30 +1,37 @@
 const mongoose = require('mongoose');
 const Booking = require('../models/Booking');
 
-async function getDailyCargoBalance(userId, date = new Date()) {
-  const start = new Date(date);
-  start.setHours(0, 0, 0, 0);
+async function getCargoBalance(operatorId, startDate, endDate) {
+  if (!mongoose.Types.ObjectId.isValid(operatorId)) {
+    throw new Error('Invalid operatorId');
+  }
 
-  const end = new Date(date);
-  end.setHours(23, 59, 59, 999);
+const match = { operatorId: new mongoose.Types.ObjectId(operatorId) };
+  if (startDate) match.bookingDate = { $gte: startDate };
+  if (endDate) {
+    match.bookingDate = match.bookingDate || {};
+    match.bookingDate.$lte = endDate;
+  }
 
-  const result = await Booking.aggregate([
-    {
-      $match: {
-        bookedBy: mongoose.Types.ObjectId(userId),
-        createdAt: { $gte: start, $lte: end },
-        lrType: 'Paid'
-      }
-    },
+  const dailyBalances = await Booking.aggregate([
+    { $match: match },
     {
       $group: {
-        _id: null,
-        totalBalance: { $sum: "$totalAmountCharge" }
+        _id: '$bookingDate',
+        totalBalance: { $sum: '$totalAmountCharge' },
+        paidBalance: {
+          $sum: { $cond: [{ $eq: ['$lrType', 'Paid'] }, '$totalAmountCharge', 0] },
+        },
+        toPayBalance: {
+          $sum: { $cond: [{ $eq: ['$lrType', 'ToPay'] }, '$totalAmountCharge', 0] },
+        },
+        bookingCount: { $sum: 1 }
       }
-    }
+    },
+    { $sort: { _id: 1 } }
   ]);
 
-  return result[0]?.totalBalance || 0;
+  return dailyBalances;
 }
 
-module.exports = { getDailyCargoBalance };
+module.exports = { getCargoBalance };

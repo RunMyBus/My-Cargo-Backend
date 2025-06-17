@@ -14,6 +14,11 @@ class RequestContext {
         return this.get().requestId;
     }
 
+    getCurrentDate() {
+        return this.get().timestamp || new Date();
+    }
+
+
     middleware() {
         return (req, res, next) => {
             const context = {
@@ -40,5 +45,8 @@ module.exports = {
     },
     getOperatorId() {
         return this.get().operatorId;
+    },
+    getCurrentDate() {
+        return this.instance.getCurrentDate();
     }
 };
