@@ -1,5 +1,6 @@
 const UserService = require('../services/UserService');
 const logger = require('../utils/logger');
+const { getCargoBalance } = require('../services/CargoBalanceService');
 
 /**
  * Get all users for the current operator
@@ -124,4 +125,14 @@ exports.getTodayCargoBalance = async (req, res) => {
   }
 };
 
+exports.getDailyCargoBalance = async (req, res) => {
+  try {
+    const operatorId = req.user.operatorId; // from auth middleware
+    const { startDate, endDate } = req.query;
 
+    const data = await getCargoBalance(operatorId, startDate, endDate);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

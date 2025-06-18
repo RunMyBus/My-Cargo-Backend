@@ -7,108 +7,104 @@ const { request } = require('express');
 const Operator = require('../models/Operator');
 
 class BookingService {
-  static async createBooking(data, userId, operatorId) {
-    try {
-      logger.info('Booking creation request received', { 
-        userId,
-        bookingData: data
-      });
+static async createBooking(data, userId, operatorId) {
+  try {
+    logger.info('Booking creation request received', {
+      userId,
+      bookingData: data
+    });
 
-      // Validate branch offices
-      const [fromBranch, toBranch] = await Promise.all([
-        Branch.findOne({ _id: data.fromOffice, operatorId, status: 'Active' }),
-        Branch.findOne({ _id: data.toOffice, operatorId, status: 'Active' })
-      ]);
-
-      if (!fromBranch) {
-        throw new Error('Invalid or inactive origin branch');
-      }
-      if (!toBranch) {
-        throw new Error('Invalid or inactive destination branch');
-      }
-      if (data.fromOffice.toString() === data.toOffice.toString()) {
-        throw new Error('Origin and destination branches cannot be the same');
-      }
-
-      const booking = new Booking({
-        ...data,
-        operatorId,
-        createdBy: userId,
-        bookedBy: userId,
-        senderName: data.senderName,
-        senderPhone: data.senderPhone,
-        senderEmail: data.senderEmail,
-        senderAddress: data.senderAddress,
-        receiverName: data.receiverName,
-        receiverPhone: data.receiverPhone, 
-      });
-
-      // Get today's date parts for bookingDate and bookingId prefix
-      const now = new Date();
-      const pad = (n) => n.toString().padStart(2, '0');
-      const year = now.getFullYear();
-      const month = pad(now.getMonth() + 1);
-      const day = pad(now.getDate());
-
-      // Set bookingDate in YYYY-MM-DD format
-      booking.bookingDate = `${year}-${month}-${day}`;
-
-      // Get operator and increment booking sequence
-      const operator = await Operator.findByIdAndUpdate(
-        operatorId,
-        { $inc: { bookingSequence: 1 } },
-        { new: true, useFindAndModify: false }
-      );
-
-      if (!operator) {
-        throw new Error('Operator not found');
-      }
-
-      // Construct bookingId using operator code and sequence
-      const sequenceStr = operator.bookingSequence.toString().padStart(4, '0');
-      const typeCode = booking.lrType === 'Paid' ? 'P' : 'TP';
-      const dateStr = `${year}${month}${day}`;
-      const bookingId = `${typeCode}-${dateStr}-${sequenceStr}`;
-      booking.bookingId = bookingId;  // e.g. P-20250609-001
-
-      // Update user's cargo balance if type is 'Paid'
-      if (booking.type === 'Paid') {
-        const user = await User.findById(userId);
-        if (!user) {
-          logger.error('User not found when updating cargo balance', {
-            userId,
-            bookingId: booking.bookingId
-          });
-          throw new Error('User not found');
-        }
-        user.cargoBalance = user.cargoBalance || 0;
-        user.cargoBalance += booking.totalAmountCharge;
-        await user.save();
-
-        logger.info('Cargo balance updated', {
-          userId: user._id,
-          newBalance: user.cargoBalance,
-          amountAdded: booking.totalAmountCharge,
-          bookingId: booking.bookingId
-        });
-      }
-
-      await booking.save();
-
-      logger.info('Booking created successfully', { 
-        bookingId: booking.bookingId
-      });
-
-      return booking;
-    } catch (error) {
-      logger.error('Error creating booking', { 
-        error: error.message,
-        stack: error.stack,
-        bookingData: data
-      });
-      throw error;
+    // Validate input ObjectIds
+    if (!mongoose.Types.ObjectId.isValid(data.fromOffice)) {
+      throw new Error('Invalid fromOffice ID');
     }
+
+    if (!mongoose.Types.ObjectId.isValid(data.toOffice)) {
+      throw new Error('Invalid toOffice ID');
+    }
+
+    // Check branch validity
+    const [fromBranch, toBranch] = await Promise.all([
+      Branch.findOne({ _id: data.fromOffice, operatorId, status: 'Active' }),
+      Branch.findOne({ _id: data.toOffice, operatorId, status: 'Active' }),
+    ]);
+
+    if (!fromBranch) throw new Error('Invalid or inactive origin branch');
+    if (!toBranch) throw new Error('Invalid or inactive destination branch');
+    if (data.fromOffice === data.toOffice) {
+      throw new Error('Origin and destination branches cannot be the same');
+    }
+
+    // Create booking
+    const booking = new Booking({
+      ...data,
+      operatorId,
+      bookedBy: userId,
+      createdBy: userId,
+    });
+
+    // Set bookingDate
+    const now = new Date();
+    const pad = (n) => n.toString().padStart(2, '0');
+    const year = now.getFullYear();
+    const month = pad(now.getMonth() + 1);
+    const day = pad(now.getDate());
+    booking.bookingDate = `${year}-${month}-${day}`;
+
+    // Generate bookingId
+    const operator = await Operator.findByIdAndUpdate(
+      operatorId,
+      { $inc: { bookingSequence: 1 } },
+      { new: true, useFindAndModify: false }
+    );
+    if (!operator) throw new Error('Operator not found');
+
+    const sequenceStr = operator.bookingSequence.toString().padStart(4, '0');
+    const typeCode = booking.lrType === 'Paid' ? 'P' : 'TP';
+    const dateStr = `${year}${month}${day}`;
+    booking.bookingId = `${typeCode}-${dateStr}-${sequenceStr}`;
+
+    // Update user cargo balance if needed
+    if (booking.lrType === 'Paid') {
+      const user = await User.findById(userId);
+      if (!user) throw new Error('User not found');
+
+      user.cargoBalance = (user.cargoBalance || 0) + booking.totalAmountCharge;
+      await user.save();
+    }
+
+    await booking.save();
+
+    // Populate before returning
+    const populatedBooking = await Booking.findById(booking._id)
+      .populate('fromOffice', '_id name')
+      .populate('toOffice', '_id name')
+      .populate('assignedVehicle', '_id vehicleNumber');
+
+    const result = populatedBooking.toObject();
+
+    if (result.assignedVehicle) {
+      result.assignedVehicle = {
+        _id: result.assignedVehicle._id,
+        vehicleNumber: result.assignedVehicle.vehicleNumber,
+      };
+    }
+
+    logger.info('Booking created successfully', {
+      bookingId: result.bookingId
+    });
+
+    return result;
+
+  } catch (error) {
+    logger.error('Error creating booking', {
+      error: error.message,
+      stack: error.stack,
+      bookingData: data
+    });
+    throw error;
   }
+}
 
   static async getAllBookings(operatorId) {
     logger.info('Fetching all bookings', { operatorId });
@@ -154,7 +150,8 @@ class BookingService {
       const booking = await Booking.findOne({ _id: id, operatorId })
         .populate('fromOffice', '_id name')
         .populate('toOffice', '_id name')
-        .populate('assignedVehicle', '_id vehicleNumber');
+        .populate('assignedVehicle', '_id vehicleNumber')
+        .populate('bookedBy', '_id fullName');
 
       if (!booking) {
         logger.warn('Booking not found', { bookingId: id, operatorId });
@@ -450,7 +447,7 @@ class BookingService {
     try {
       const skip = (page - 1) * limit;
       const baseFilter = {
-        status: 'InTransit',
+        status: { $in: ['InTransit', 'Booked'] },
         operatorId
       };
 
@@ -474,9 +471,7 @@ class BookingService {
         .populate('toOffice', '_id name')
         .populate('assignedVehicle', '_id vehicleNumber')
         .populate('operatorId', '_id')
-        .populate('loadedBy', '_id')
-        .populate('unloadedBy', '_id')
-        .populate('deliveredBy', '_id')
+        .populate('bookedBy', '_id fullName')
     ]);
 
     const bookings = rawBookings.map(b => {
@@ -547,7 +542,7 @@ class BookingService {
         : operatorId;
 
       const baseFilter = {
-        status: 'Arrived',
+        status: { $in: ['Arrived', 'Booked'] },
         operatorId: opId
       };
 
@@ -561,6 +556,8 @@ class BookingService {
         logger.debug('Applied search filter', { filter: baseFilter.$or });
       }
 
+    logger.info('Fetching arrived bookings with filter:', baseFilter);
+
     const [total, rawBookings] = await Promise.all([
       Booking.countDocuments(baseFilter),
       Booking.find(baseFilter)
@@ -571,6 +568,10 @@ class BookingService {
         .populate('toOffice', '_id name')
         .populate('assignedVehicle', '_id vehicleNumber')
         .populate('operatorId', '_id name')
+        .populate('bookedBy', '_id fullName')
+        .populate('loadedBy', '_id fullName')
+        .populate('unloadedBy', '_id fullName')
+        .populate('deliveredBy', '_id fullName')
     ]);
     
     logger.debug('Fetched arrived bookings', { total, limit, skip });
@@ -578,7 +579,6 @@ class BookingService {
     const formattedBookings = rawBookings.map(b => {
       const booking = b.toObject();
 
-      // bookedBy direct ObjectId string from DB field, no populate needed
       booking.bookedBy = b.bookedBy ? b.bookedBy.toString() : null;
 
       booking.operatorId = b.operatorId?._id?.toString() || null;
@@ -635,41 +635,46 @@ class BookingService {
     try {
       const mongoQuery = { operatorId };
 
-      if (query && query.trim() !== "") {
-        mongoQuery.$or = [
-          { bookingId: { $regex: query.trim(), $options: "i" } },
-          { senderName: { $regex: query.trim(), $options: "i" } },
-          { receiverName: { $regex: query.trim(), $options: "i" } },
-        ];
-      }
+    if (query.trim()) {
+      const regex = new RegExp(query.trim(), "i");
+      mongoQuery.$or = [
+        { bookingId: regex },
+        { senderName: regex },
+        { receiverName: regex },
+      ];
+    }
 
-      if (status && status.trim() !== "") {
-        mongoQuery.status = status.trim();
-      }
+    if (status.trim()) {
+      // Case-insensitive exact match for status using regex
+      const statusRegex = new RegExp(`^${status.trim()}$`, "i");
+      mongoQuery.status = statusRegex;
+    }
+
+    console.log("MongoDB query:", JSON.stringify(mongoQuery, null, 2));
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      const [total, bookings] = await Promise.all([
-        Booking.countDocuments(mongoQuery),
-        Booking.find(mongoQuery)
-          .skip(skip)
-          .limit(parseInt(limit))
-          .sort({ createdAt: -1 })
-          .populate({ path: 'fromOffice', select: '_id name' })
-          .populate({ path: 'toOffice', select: '_id name' })
-          .populate({ path: 'assignedVehicle', select: '_id vehicleNumber' })
-      ]);
+    const [total, bookings] = await Promise.all([
+      Booking.countDocuments(mongoQuery),
+      Booking.find(mongoQuery)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .sort({ createdAt: -1 })
+        .populate({ path: "fromOffice", select: "_id name" })
+        .populate({ path: "toOffice", select: "_id name" })
+        .populate({ path: "assignedVehicle", select: "_id vehicleNumber" }),
+    ]);
 
-      const formattedBookings = bookings.map(booking => {
-        const b = booking.toObject();
-        if (b.assignedVehicle) {
-          b.assignedVehicle = {
-            _id: b.assignedVehicle._id,
-            assignedVehicle: b.assignedVehicle.vehicleNumber
-          };
-        }
-        return b;
-      });
+    const formattedBookings = bookings.map((booking) => {
+      const b = booking.toObject();
+      if (b.assignedVehicle?.vehicleNumber) {
+        b.assignedVehicle = {
+          _id: b.assignedVehicle._id,
+          assignedVehicle: b.assignedVehicle.vehicleNumber,
+        };
+      }
+      return b;
+    });
 
       const result = {
         total,
@@ -699,3 +704,4 @@ class BookingService {
 }
 
 module.exports = BookingService;
+

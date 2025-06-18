@@ -12,7 +12,7 @@ class RoleService {
     logger.info('Creating new role', { rolename: roleData.rolename, operatorId });
     
     try {
-      const { rolename, description, permissions } = roleData;
+      const { rolename, description } = roleData;
 
       if (!rolename || !description || !operatorId) {
         const error = new Error('Rolename, description, and operatorId are required');
@@ -36,7 +36,6 @@ class RoleService {
         rolecode: nextCode,
         rolename,
         description,
-        permissions,
         operatorId,
       });
 
@@ -63,7 +62,7 @@ class RoleService {
     logger.info('Fetching all roles');
     
     try {
-      const roles = await Role.find().populate('permissions');
+      const roles = await Role.find();
       logger.debug(`Fetched ${roles.length} roles`);
       return roles;
     } catch (error) {
@@ -106,7 +105,6 @@ class RoleService {
       const [total, roles] = await Promise.all([
         Role.countDocuments(query),
         Role.find(query)
-          .populate('permissions')
           .skip((page - 1) * limit)
           .limit(parseInt(limit))
       ]);
@@ -139,7 +137,7 @@ class RoleService {
     logger.info('Fetching role by ID', { roleId });
     
     try {
-      const role = await Role.findById(roleId).populate('permissions');
+      const role = await Role.findById(roleId);
       
       if (!role) {
         const error = new Error('Role not found');
@@ -179,7 +177,7 @@ class RoleService {
         roleId,
         { ...updateData, updatedAt: new Date() },
         { new: true, runValidators: true }
-      ).populate('permissions');
+      );
 
       if (!updatedRole) {
         const error = new Error('Role not found');

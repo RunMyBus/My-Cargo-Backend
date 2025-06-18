@@ -1,6 +1,10 @@
+const { log } = require('winston');
 const BookingService = require('../services/BookingService');
 const logger = require('../utils/logger');
 const requestContext = require('../utils/requestContext');
+const { Parser } = require('json2csv');
+const ExportService = require('../services/ExportService');
+const { getCargoBalance } = require('../services/CargoBalanceService');
 
 // Create booking
 exports.createBooking = async (req, res) => {
@@ -27,6 +31,7 @@ exports.getAllBookings = async (req, res) => {
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
+
     const result = await BookingService.getAllBookings(operatorId);
     res.json(result);
   } catch (error) {
@@ -155,46 +160,167 @@ exports.getInTransitBookings = async (req, res) => {
 // Get arrived bookings
 exports.getArrivedBookings = async (req, res) => {
   try {
-    console.log('getArrivedBookings called');
     const operatorId = requestContext.getOperatorId();
-    console.log('operatorId:', operatorId);
 
     if (!operatorId) {
-      console.log('No operatorId provided');
       return res.status(400).json({ error: 'Operator ID is required' });
     }
 
     const { page = 1, limit = 10, query = "" } = req.body;
-    console.log({ page, limit, query });
 
     const result = await BookingService.getArrivedBookings(operatorId, page, limit, query);
-    console.log('Result:', result);
 
     res.json(result);
   } catch (error) {
-    console.error('Error getting arrived bookings:', error);
+    logger.error('Error getting arrived bookings:', {
+      message: error.message,
+      stack: error.stack
+    });
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
 
 // Search bookings with pagination
-exports.searchBookingsPost = async (req, res) => {
+// Search bookings with pagination
+exports.searchBookings = async (req, res) => {
+  try {
+    const { limit = 10, page = 1, query = "", status = "" } = req.body;
+    const operatorId = req.user?.operatorId;
+
+    if (!operatorId) {
+      return res.status(400).json({ message: "Operator ID missing" });
+    }
+
+    const result = await BookingService.searchBookings({
+      operatorId,
+      limit,
+      page,
+      query,
+      status
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('SEARCH_BOOKINGS_ERROR:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+exports.exportBookings = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId();
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
-    const { limit = 10, page = 1, query = "", status } = req.body;
-    const result = await BookingService.searchBookings({ 
-      operatorId,
-      limit, 
-      page, 
-      query, 
-      status 
-    });
-    res.json(result);
+
+    const csv = await ExportService.exportBookings(operatorId);
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment(`bookings-${Date.now()}.csv`);
+    res.send(csv);
   } catch (error) {
-    logger.error('Error searching bookings in controller', { error: error.message });
-    res.status(400).json({ error: error.message });
+    logger.error('Error exporting bookings', { error: error.message });
+    res.status(500).json({ error: 'Failed to export bookings' });
+  }
+};
+
+exports.exportUnassignedBookings = async (req, res) => {
+  try {
+    const operatorId = requestContext.getOperatorId();
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+
+    const query = req.query?.query || '';
+
+    const csv = await ExportService.exportUnassignedBookings(operatorId, query);
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment(`unassigned_bookings_${Date.now()}.csv`);
+    res.send(csv);
+  } catch (error) {
+    if (error.message === 'No unassigned bookings found to export') {
+      return res.status(404).json({ message: error.message });
+    }
+
+    logger.error('Error exporting unassigned bookings', {
+      error: error.message,
+      stack: error.stack,
+    });
+
+    res.status(500).json({ error: 'Failed to export unassigned bookings' });
+  }
+};
+
+exports.exportArrivedBookings = async (req, res) => {
+  try {
+    const operatorId = requestContext.getOperatorId();
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+
+    const query = req.body?.query || '';
+
+    const csv = await ExportService.exportArrivedBookings(operatorId, query);
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment(`arrived_bookings_${Date.now()}.csv`);
+    res.send(csv);
+  } catch (error) {
+    if (error.message === 'No arrived bookings found to export') {
+      return res.status(404).json({ message: error.message });
+    }
+
+    logger.error('Error exporting arrived bookings', {
+      error: error.message,
+      stack: error.stack,
+    });
+
+    res.status(500).json({ error: 'Failed to export arrived bookings' });
+  }
+};
+
+exports.exportInTransitBookings = async (req, res) => {
+  try {
+    const operatorId = requestContext.getOperatorId();
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+
+    const query = req.body?.query || '';
+
+    const csv = await ExportService.exportInTransitBookings(operatorId, query);
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment(`in_transit_bookings_${Date.now()}.csv`);
+    res.send(csv);
+  } catch (error) {
+    if (error.message === 'No in transit bookings found to export') {
+      return res.status(404).json({ message: error.message });
+    }
+
+    logger.error('Error exporting in transit bookings', {
+      error: error.message,
+      stack: error.stack,
+    });
+
+    res.status(500).json({ error: 'Failed to export in transit bookings' });
+  }
+};
+
+exports.getCargoBalanceController = async (req, res) => {
+  try {
+    const operatorId = requestContext.getOperatorId();
+    if (!operatorId) {
+      return res.status(400).json({ message: 'Invalid or missing operatorId' });
+    }
+
+    const { startDate, endDate } = req.query;
+    const result = await getCargoBalance(operatorId, startDate, endDate);
+
+    res.status(200).json(result);
+  } catch (error) {
+    logger.error('GET_CARGO_BALANCE_ERROR:', error);
+    res.status(500).json({ message: error.message || 'Internal server error' });
   }
 };

@@ -54,7 +54,7 @@ const logger = winston.createLogger({
     ]
 });
 
-console.log(`Logger initialized with level: ${logger.level} --- ${new Date().toISOString()}`);
+logger.info(`Logger initialized with level: ${logger.level} --- ${new Date().toISOString()}`);
 
 /** NOTE: To be used in local **/
 // Create a CLI interface for real-time log level changes
@@ -67,9 +67,9 @@ rl.on('line', (input) => {
     const validLevels = ['error', 'warn', 'info', 'debug'];
     if (validLevels.includes(input.trim())) {
         logger.level = input.trim();
-        console.log(`Log level changed to: ${input.trim()}`);
+        logger.log(`Log level changed to: ${input.trim()}`);
     } else {
-        console.log('Invalid log level. Use one of:', validLevels.join(', '));
+        logger.log('Invalid log level. Use one of:', validLevels.join(', '));
     }
 });
 
