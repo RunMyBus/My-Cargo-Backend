@@ -4,7 +4,7 @@ const logger = require('../utils/logger');
 const requestContext = require('../utils/requestContext');
 const { Parser } = require('json2csv');
 const ExportService = require('../services/ExportService');
-const CargoBalanceService = require('../services/CargoBalanceService');
+const { getCargoBalance } = require('../services/CargoBalanceService');
 
 // Create booking
 exports.createBooking = async (req, res) => {
@@ -305,5 +305,22 @@ exports.exportInTransitBookings = async (req, res) => {
     });
 
     res.status(500).json({ error: 'Failed to export in transit bookings' });
+  }
+};
+
+exports.getCargoBalanceController = async (req, res) => {
+  try {
+    const operatorId = requestContext.getOperatorId();
+    if (!operatorId) {
+      return res.status(400).json({ message: 'Invalid or missing operatorId' });
+    }
+
+    const { startDate, endDate } = req.query;
+    const result = await getCargoBalance(operatorId, startDate, endDate);
+
+    res.status(200).json(result);
+  } catch (error) {
+    logger.error('GET_CARGO_BALANCE_ERROR:', error);
+    res.status(500).json({ message: error.message || 'Internal server error' });
   }
 };

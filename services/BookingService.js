@@ -447,7 +447,7 @@ static async createBooking(data, userId, operatorId) {
     try {
       const skip = (page - 1) * limit;
       const baseFilter = {
-        status: 'InTransit',
+        status: { $in: ['InTransit', 'Booked'] },
         operatorId
       };
 
@@ -471,9 +471,7 @@ static async createBooking(data, userId, operatorId) {
         .populate('toOffice', '_id name')
         .populate('assignedVehicle', '_id vehicleNumber')
         .populate('operatorId', '_id')
-        .populate('loadedBy', '_id')
-        .populate('unloadedBy', '_id')
-        .populate('deliveredBy', '_id')
+        .populate('bookedBy', '_id fullName')
     ]);
 
     const bookings = rawBookings.map(b => {
@@ -544,7 +542,7 @@ static async createBooking(data, userId, operatorId) {
         : operatorId;
 
       const baseFilter = {
-        status: 'Arrived',
+        status: { $in: ['Arrived', 'Booked'] },
         operatorId: opId
       };
 
@@ -570,6 +568,10 @@ static async createBooking(data, userId, operatorId) {
         .populate('toOffice', '_id name')
         .populate('assignedVehicle', '_id vehicleNumber')
         .populate('operatorId', '_id name')
+        .populate('bookedBy', '_id fullName')
+        .populate('loadedBy', '_id fullName')
+        .populate('unloadedBy', '_id fullName')
+        .populate('deliveredBy', '_id fullName')
     ]);
     
     logger.debug('Fetched arrived bookings', { total, limit, skip });

@@ -6,7 +6,7 @@ async function getCargoBalance(operatorId, startDate, endDate) {
     throw new Error('Invalid operatorId');
   }
 
-const match = { operatorId: new mongoose.Types.ObjectId(operatorId) };
+  const match = { operatorId: new mongoose.Types.ObjectId(operatorId) };
   if (startDate) match.bookingDate = { $gte: startDate };
   if (endDate) {
     match.bookingDate = match.bookingDate || {};
