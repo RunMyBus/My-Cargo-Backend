@@ -1,5 +1,26 @@
 const mongoose = require('mongoose');
 
+const statusUpdateSchema = new mongoose.Schema({
+  status: {
+    type: String,
+    enum: ['Booked', 'Loaded', 'Unloaded', 'Delivered'],
+    required: true
+  },
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  vehicleNumber: {
+    type: String,
+    default: null
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now
+  }
+}, { _id: false });
+
 const bookingSchema = new mongoose.Schema({
   bookingId: { type: String, unique: true },
   bookingDate: { type: String, index: true },
@@ -65,6 +86,14 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     enum: ['Paid', 'ToPay'],
     default: 'Paid',
+    required: true
+  },
+
+  // Payment Type
+  paymentType: {
+    type: String,
+    enum: ['cash', 'UPI'],
+    default: 'cash',
     required: true
   }
 

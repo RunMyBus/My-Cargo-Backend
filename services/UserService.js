@@ -57,66 +57,72 @@ class UserService {
    * @param {Object} userData - User data
    * @returns {Promise<Object>} Created user
    */
-  static async createUser(userData) {
-    const { mobile, password, role, branchId, operatorId } = userData;
-    logger.info('Creating new user', { mobile, role, operatorId });
+  static async createUser(userData, currentOperatorId) {
+  const { mobile, password, role, branchId } = userData;
+  logger.info('Creating new user', { mobile, role, operatorId: userData.operatorId });
 
-    try {
-      // Check if mobile number exists
-      const existingUser = await User.findOne({ mobile });
-      if (existingUser) {
-        logger.warn('Mobile number already exists', { mobile });
-        throw new Error('Mobile number already exists');
-      }
-
-      // Validate role
-      const roleExists = await Role.findById(role);
-      if (!roleExists) {
-        logger.warn('Invalid role ID provided', { role });
-        throw new Error('Invalid role ID');
-      }
-
-      // Validate branch if provided
-      if (branchId) {
-        const branchExists = await Branch.findById(branchId);
-        if (!branchExists) {
-          logger.warn('Invalid branch ID provided', { branchId });
-          throw new Error('Invalid branch ID');
-        }
-      }
-
-      // Format status
-      const status = userData.status?.charAt(0).toUpperCase() + 
-                    (userData.status?.slice(1).toLowerCase() || '');
-
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      // Create user
-      const newUser = new User({
-        ...userData,
-        password: hashedPassword,
-        status: status || 'Active',
-        operatorId,
-        cargoBalance: 0,
-      });
-
-      const savedUser = await newUser.save();
-      const userResponse = savedUser.toObject();
-      delete userResponse.password;
-
-      logger.info('User created successfully', { userId: savedUser._id, mobile });
-      return userResponse;
-    } catch (error) {
-      logger.error('Error creating user', { 
-        error: error.message, 
-        mobile, 
-        operatorId,
-        stack: error.stack 
-      });
-      throw error;
+  try {
+    // Check if mobile number exists
+    const existingUser = await User.findOne({ mobile });
+    if (existingUser) {
+      logger.warn('Mobile number already exists', { mobile });
+      throw new Error('Mobile number already exists');
     }
+
+    // Validate role
+    const roleExists = await Role.findById(role);
+    if (!roleExists) {
+      logger.warn('Invalid role ID provided', { role });
+      throw new Error('Invalid role ID');
+    }
+
+    // Validate branch if provided
+    if (branchId) {
+      const branchExists = await Branch.findById(branchId);
+      if (!branchExists) {
+        logger.warn('Invalid branch ID provided', { branchId });
+        throw new Error('Invalid branch ID');
+      }
+    }
+
+    // Determine operatorId: from userData if provided, otherwise fallback
+    const operatorIdToUse = userData.operatorId || currentOperatorId;
+    if (!operatorIdToUse) {
+      throw new Error('Operator ID is required');
+    }
+
+    // Format status
+    const status = userData.status?.charAt(0).toUpperCase() +
+                   (userData.status?.slice(1).toLowerCase() || '');
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user
+    const newUser = new User({
+      ...userData,
+      password: hashedPassword,
+      status: status || 'Active',
+      operatorId: operatorIdToUse,
+      cargoBalance: 0,
+    });
+
+    const savedUser = await newUser.save();
+    const userResponse = savedUser.toObject();
+    delete userResponse.password;
+
+    logger.info('User created successfully', { userId: savedUser._id, mobile });
+    return userResponse;
+  } catch (error) {
+    logger.error('Error creating user', {
+      error: error.message,
+      mobile,
+      operatorId: userData.operatorId || currentOperatorId,
+      stack: error.stack
+    });
+    throw error;
   }
+}
 
   /**
    * Update user
