@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const Operator = require('../models/Operator');
 
 // Register Controller
 exports.register = async (req, res) => {
@@ -68,6 +69,12 @@ exports.login = async (req, res) => {
 
     user.token = token;
     await user.save();
+     let paymentOptions = [];
+    if (user.operatorId) {
+      const operator = await Operator.findById(user.operatorId);
+      paymentOptions = operator?.paymentOptions || [];
+    }
+
 
     res.status(200).json({
       status: 200,
@@ -76,6 +83,8 @@ exports.login = async (req, res) => {
       fullName: user.fullName,
       token: token,
       role: user.role?.rolename  || null,
+      operatorId: user.operatorId,
+      paymentOptions,
       message: 'LOGGED_IN_SUCCESSFULLY'
     });
   } catch (error) {
