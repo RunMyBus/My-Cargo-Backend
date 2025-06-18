@@ -9,5 +9,6 @@ router.use(passport.authenticate('jwt', { session: false }));
 router.get('/todayBookings', chartController.getTodayBookingsByPayment);
 router.get('/branchBookings', chartController.getBookingsByBranchAndPayment);
 router.get('/sixMonthBookings', chartController.getSixMonthBookings);
+router.get('/pendingBookingsByBranch', chartController.getPendingBookingsByBranch);
 
 module.exports = router;

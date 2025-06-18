@@ -1111,7 +1111,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYmM0YjhkOWZhMzRhMWM1Yjk1OTQiLCJpYXQiOjE3NDk3OTM4ODIsImV4cCI6MTc0OTg4MDI4Mn0.Css_bwm-vlnbjmd3mfLBKuz0GfYkzyFn0cfNzrUy5tc",
+									"value": "{{token}}",
 									"type": "string"
 								}
 							]
@@ -1120,7 +1120,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Whizzarddd\",\n    \"address\": \"Bangalore\",\n    \"phone\": \"0123456789\",\n    \"status\": \"active\",\n    \"code\": \"WIZZZ\"\n}",
+							"raw": "{\n    \"name\": \"Whizzarddd\",\n    \"address\": \"Bangalore\",\n    \"phone\": \"0123456789\",\n    \"status\": \"Active\",\n    \"code\": \"WIZZZ\",\n    \"paymentOptions\": [\"cash\", \"UPI\"] \n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -1184,6 +1184,133 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "Charts",
+			"item": [
+				{
+					"name": "Get Current Bookings",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/charts/todayBookings",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"charts",
+								"todayBookings"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current Branch Bookings",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/charts/branchBookings",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"charts",
+								"branchBookings"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Six Month Bookings",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/charts/sixMonthBookings?month=Jun 2025",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"charts",
+								"sixMonthBookings"
+							],
+							"query": [
+								{
+									"key": "month",
+									"value": "Jun 2025"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Pending Bookings",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/charts/pendingBookingsByBranch",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"charts",
+								"pendingBookingsByBranch"
+							]
+						}
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"auth": {
@@ -1191,7 +1318,7 @@
 		"bearer": [
 			{
 				"key": "token",
-				"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYmM0YjhkOWZhMzRhMWM1Yjk1OTQiLCJpYXQiOjE3NDk4MDYyNDYsImV4cCI6MTc0OTg5MjY0Nn0.5Z-rggsQhB-eprVJrllOQumrLXnqhO4enJqbfLnfPn0",
+				"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODUwZjE4MGUzMjdlMjE5ZTFlYmMzYWEiLCJpYXQiOjE3NTAxMzcxMjIsImV4cCI6MTc1MDIyMzUyMn0.QRt_FFLsHlg7JiJNf-7kjszJCJkISMOah2fm9up803w",
 				"type": "string"
 			}
 		]
