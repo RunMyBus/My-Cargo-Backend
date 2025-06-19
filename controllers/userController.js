@@ -1,6 +1,7 @@
 const UserService = require('../services/UserService');
 const logger = require('../utils/logger');
 const { getCargoBalance } = require('../services/CargoBalanceService');
+const requestContext = require('../utils/requestContext');
 
 /**
  * Get all users for the current operator
@@ -37,20 +38,11 @@ exports.getUserById = async (req, res) => {
  */
 exports.createUser = async (req, res) => {
   try {
-    const operatorId = req.user?.operatorId;
-    if (!operatorId) {
-      return res.status(400).json({ message: 'Operator ID is required' });
-    }
-
-    const userData = { ...req.body, operatorId };
-    const newUser = await UserService.createUser(userData);
-    res.status(201).json(newUser);
+    const operatorId = requestContext.getOperatorId();
+    const result = await UserService.createUser(req.body, operatorId);
+    res.status(201).json(result);
   } catch (error) {
-    if (['Mobile number already exists', 'Invalid role ID', 'Invalid branch ID'].includes(error.message)) {
-      return res.status(400).json({ message: error.message });
-    }
-    logger.error('Error in createUser controller', { error: error.message });
-    res.status(500).json({ message: 'Failed to create user' });
+    res.status(400).json({ message: error.message });
   }
 };
 

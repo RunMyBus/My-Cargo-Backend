@@ -60,3 +60,30 @@ exports.searchOperators = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+/**
+ * @route   GET /api/operators/:operatorId/payment-options
+ * @desc    Get payment options for an operator
+ * @access  Private
+ */
+exports.getPaymentOptions = async (req, res) => {
+  try {
+    const operatorId = req.user.operatorId;
+
+    if (!operatorId) {
+      return res.status(400).json({ message: 'Operator ID not found for the current user' });
+    }
+
+    const paymentOptions = await OperatorService.getPaymentOptions(operatorId);
+
+    if (!paymentOptions) {
+      return res.status(404).json({ message: 'Operator not found' });
+    }
+
+    res.status(200).json({ paymentOptions });
+
+  } catch (error) {
+    console.error('Error fetching payment options:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

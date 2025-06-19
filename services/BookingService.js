@@ -14,7 +14,7 @@ static async createBooking(data, userId, operatorId) {
       bookingData: data
     });
 
-    // Validate input ObjectIds
+    // Validate ObjectIds
     if (!mongoose.Types.ObjectId.isValid(data.fromOffice)) {
       throw new Error('Invalid fromOffice ID');
     }
@@ -23,7 +23,7 @@ static async createBooking(data, userId, operatorId) {
       throw new Error('Invalid toOffice ID');
     }
 
-    // Check branch validity
+    // Validate branches
     const [fromBranch, toBranch] = await Promise.all([
       Branch.findOne({ _id: data.fromOffice, operatorId, status: 'Active' }),
       Branch.findOne({ _id: data.toOffice, operatorId, status: 'Active' }),
@@ -35,12 +35,24 @@ static async createBooking(data, userId, operatorId) {
       throw new Error('Origin and destination branches cannot be the same');
     }
 
-    // Create booking
+    // Validate paymentType against operator's allowed paymentOptions
+    const operator = await Operator.findById(operatorId);
+    if (!operator) throw new Error('Operator not found');
+
+    const allowedOptions = operator.paymentOptions || [];
+    const selectedPaymentType = data.paymentType;
+
+    if (!selectedPaymentType || !allowedOptions.includes(selectedPaymentType)) {
+      throw new Error(`Invalid payment type selected. Allowed: ${allowedOptions.join(', ')}`);
+    }
+
+    // Create booking with paymentType
     const booking = new Booking({
       ...data,
       operatorId,
       bookedBy: userId,
       createdBy: userId,
+      paymentType: selectedPaymentType
     });
 
     // Set bookingDate
@@ -52,19 +64,19 @@ static async createBooking(data, userId, operatorId) {
     booking.bookingDate = `${year}-${month}-${day}`;
 
     // Generate bookingId
-    const operator = await Operator.findByIdAndUpdate(
+    const updatedOperator = await Operator.findByIdAndUpdate(
       operatorId,
       { $inc: { bookingSequence: 1 } },
       { new: true, useFindAndModify: false }
     );
-    if (!operator) throw new Error('Operator not found');
+    if (!updatedOperator) throw new Error('Operator not found');
 
-    const sequenceStr = operator.bookingSequence.toString().padStart(4, '0');
+    const sequenceStr = updatedOperator.bookingSequence.toString().padStart(4, '0');
     const typeCode = booking.lrType === 'Paid' ? 'P' : 'TP';
     const dateStr = `${year}${month}${day}`;
     booking.bookingId = `${typeCode}-${dateStr}-${sequenceStr}`;
 
-    // Update user cargo balance if needed
+    // Update cargo balance for paid bookings
     if (booking.lrType === 'Paid') {
       const user = await User.findById(userId);
       if (!user) throw new Error('User not found');
@@ -75,7 +87,7 @@ static async createBooking(data, userId, operatorId) {
 
     await booking.save();
 
-    // Populate before returning
+    // Populate references
     const populatedBooking = await Booking.findById(booking._id)
       .populate('fromOffice', '_id name')
       .populate('toOffice', '_id name')
@@ -114,7 +126,11 @@ static async createBooking(data, userId, operatorId) {
         Booking.find({ operatorId })
           .populate('fromOffice', 'name')
           .populate('toOffice', 'name')
-          .populate('assignedVehicle', 'vehicleNumber'),
+          .populate('assignedVehicle', 'vehicleNumber')
+          .populate('loadedBy', '_id fullName')
+          .populate('unloadedBy', '_id fullName')
+          .populate('deliveredBy', '_id fullName')
+          .populate('bookedBy', '_id fullName'),
         Booking.countDocuments({ operatorId })
       ]);
 
@@ -151,7 +167,10 @@ static async createBooking(data, userId, operatorId) {
         .populate('fromOffice', '_id name')
         .populate('toOffice', '_id name')
         .populate('assignedVehicle', '_id vehicleNumber')
-        .populate('bookedBy', '_id fullName');
+        .populate('bookedBy', '_id fullName')
+        .populate('loadedBy', '_id fullName')
+        .populate('unloadedBy', '_id fullName')
+        .populate('deliveredBy', '_id fullName');
 
       if (!booking) {
         logger.warn('Booking not found', { bookingId: id, operatorId });
@@ -385,6 +404,10 @@ static async createBooking(data, userId, operatorId) {
         .populate('toOffice', '_id name')
         .populate('operatorId', '_id')
         .populate('assignedVehicle', '_id vehicleNumber')
+        .populate('bookedBy', '_id fullName')
+        .populate('loadedBy', '_id fullName')
+        .populate('unloadedBy', '_id fullName')
+        .populate('deliveredBy', '_id fullName')
     ]);
 
     const bookings = rawBookings.map(b => {
@@ -472,6 +495,9 @@ static async createBooking(data, userId, operatorId) {
         .populate('assignedVehicle', '_id vehicleNumber')
         .populate('operatorId', '_id')
         .populate('bookedBy', '_id fullName')
+        .populate('loadedBy', '_id fullName')
+        .populate('unloadedBy', '_id fullName')
+        .populate('deliveredBy', '_id fullName')
     ]);
 
     const bookings = rawBookings.map(b => {
@@ -662,7 +688,11 @@ static async createBooking(data, userId, operatorId) {
         .sort({ createdAt: -1 })
         .populate({ path: "fromOffice", select: "_id name" })
         .populate({ path: "toOffice", select: "_id name" })
-        .populate({ path: "assignedVehicle", select: "_id vehicleNumber" }),
+        .populate({ path: "assignedVehicle", select: "_id vehicleNumber" })
+        .populate({ path: "bookedBy", select: "_id fullName" })
+        .populate({ path: "loadedBy", select: "_id fullName" })
+        .populate({ path: "unloadedBy", select: "_id fullName" })
+        .populate({ path: "deliveredBy", select: "_id fullName" }),
     ]);
 
     const formattedBookings = bookings.map((booking) => {
