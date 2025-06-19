@@ -20,20 +20,7 @@ class RoleService {
         throw error;
       }
 
-      // Get the highest existing rolecode for this operator
-      const lastRole = await Role.findOne({ operatorId })
-        .sort({ rolecode: -1 })
-        .collation({ locale: 'en', numericOrdering: true });
-
-      // Generate next rolecode
-      let nextCode = '0001';
-      if (lastRole?.rolecode) {
-        const numericCode = parseInt(lastRole.rolecode, 10) + 1;
-        nextCode = numericCode.toString().padStart(4, '0');
-      }
-
       const role = new Role({
-        rolecode: nextCode,
         rolename,
         description,
         operatorId,
@@ -96,7 +83,6 @@ class RoleService {
       const query = {
         operatorId,
         $or: [
-          { rolecode: { $regex: keyword, $options: 'i' } },
           { rolename: { $regex: keyword, $options: 'i' } },
           { description: { $regex: keyword, $options: 'i' } }
         ]

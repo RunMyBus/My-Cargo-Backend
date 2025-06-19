@@ -87,6 +87,33 @@ static async deleteOperator(operatorId) {
             totalPages: Math.ceil(total / limit),
         };
     }
+
+ /**
+   * Get payment options for a specific operator
+   * @param {string} operatorId
+   * @returns {Promise<Array>} paymentOptions
+   */
+  static async getPaymentOptions(operatorId) {
+    try {
+      logger.info('Fetching payment options', { operatorId });
+
+      const operator = await Operator.findById(operatorId);
+      if (!operator) {
+        logger.warn('Operator not found for payment options', { operatorId });
+        return null;
+      }
+
+      return operator.paymentOptions || [];
+    } catch (error) {
+      logger.error('Failed to fetch payment options', {
+        error: error.message,
+        operatorId,
+        stack: error.stack
+      });
+      throw new Error('Unable to fetch payment options');
+    }
+  }
 }
+
 
 module.exports = OperatorService;

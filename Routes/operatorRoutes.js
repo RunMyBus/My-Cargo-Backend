@@ -11,6 +11,9 @@ router.post('/create', operatorController.createOperator);
 // Get all operators
 router.get('/', operatorController.getAllOperators);
 
+// Get payment options
+router.get('/payment', operatorController.getPaymentOptions);
+
 // Update an operator
 router.put('/:id', operatorController.updateOperator);
 
