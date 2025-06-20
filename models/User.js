@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema({
   status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
   role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },
   operatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Operator', required: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 },
 {timestamps: true});
 

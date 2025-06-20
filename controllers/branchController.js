@@ -4,7 +4,9 @@ const requestContext = require('../utils/requestContext');
 
 exports.createBranch = async (req, res) => {
   try {
-    const operatorId = requestContext.getOperatorId(req);
+    const operatorId = requestContext.getOperatorId();
+    const userId = req.user._id;
+
     if (!operatorId) {
       return res.status(400).json({ message: 'Operator ID is required' });
     }
@@ -22,6 +24,7 @@ exports.createBranch = async (req, res) => {
       manager,
       status,
       operatorId,
+      createdBy: userId,
     });
 
     await branch.save();

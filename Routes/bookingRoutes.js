@@ -18,7 +18,6 @@ router.get('/export/bookings', bookingController.exportBookings);
 router.get('/export/unassigned', bookingController.exportUnassignedBookings);
 router.get('/export/arrived', bookingController.exportArrivedBookings);
 router.get('/export/in-transit', bookingController.exportInTransitBookings);
-router.get('/cargoBalance', bookingController.getCargoBalanceController);
 router.get('/all', bookingController.getAllBookings);
 
 // Dynamic routes with :id last

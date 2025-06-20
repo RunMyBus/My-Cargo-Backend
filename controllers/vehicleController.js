@@ -30,6 +30,8 @@ exports.searchVehicles = async (req, res) => {
 
 // POST /vehicles
 exports.createVehicle = async (req, res) => {
+  const userId = req.user._id;
+
   try {
     const operatorId = requestContext.getOperatorId(req);
 
@@ -37,10 +39,17 @@ exports.createVehicle = async (req, res) => {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
 
-    const vehicle = await VehicleService.createVehicle(operatorId, req.body);
+    const vehicle = await VehicleService.createVehicle(operatorId, req.body, userId);
+
     res.status(201).json(vehicle);
   } catch (err) {
-    logger.error('CREATE_VEHICLE_ERROR:', err);
+    logger.error('CREATE_VEHICLE_ERROR', {
+      message: err.message,
+      stack: err.stack,
+      userId,
+      operatorId: requestContext.getOperatorId(req),
+    });
+
     res.status(400).json({ error: err.message });
   }
 };

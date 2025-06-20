@@ -1,6 +1,5 @@
 const UserService = require('../services/UserService');
 const logger = require('../utils/logger');
-const { getCargoBalance } = require('../services/CargoBalanceService');
 const requestContext = require('../utils/requestContext');
 
 /**
@@ -39,12 +38,24 @@ exports.getUserById = async (req, res) => {
 exports.createUser = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId();
-    const result = await UserService.createUser(req.body, operatorId);
+    const createdBy = req.user._id;
+
+    const result = await UserService.createUser(req.body, operatorId, createdBy);
+
+    // Respond with the full saved user document (including password and timestamps)
     res.status(201).json(result);
   } catch (error) {
+    logger.error('Error in createUser controller', {
+      message: error.message,
+      stack: error.stack,
+      createdBy: req.user?._id || 'Unknown',
+      requestBody: req.body,
+    });
+
     res.status(400).json({ message: error.message });
   }
 };
+
 
 /**
  * Update user
@@ -85,6 +96,7 @@ exports.deleteUser = async (req, res) => {
  * Search users with pagination
  */
 exports.searchUsers = async (req, res) => {
+  const userId = req.user._id;
   try {
     const { query = "", page = 1, limit = 10 } = req.body;
     const operatorId = req.user?.operatorId;
@@ -93,7 +105,8 @@ exports.searchUsers = async (req, res) => {
       query,
       page: Number(page),
       limit: Number(limit),
-      operatorId
+      operatorId,
+      createdBy: userId
     });
 
     res.json(result);
@@ -114,17 +127,5 @@ exports.getTodayCargoBalance = async (req, res) => {
   } catch (error) {
     logger.error('Error in getTodayCargoBalance controller', { error: error.message });
     res.status(500).json({ message: 'Failed to get cargo balance' });
-  }
-};
-
-exports.getDailyCargoBalance = async (req, res) => {
-  try {
-    const operatorId = req.user.operatorId; // from auth middleware
-    const { startDate, endDate } = req.query;
-
-    const data = await getCargoBalance(operatorId, startDate, endDate);
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
   }
 };

@@ -10,15 +10,21 @@ const logger = require('../utils/logger');
 exports.createRole = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId();
-    const role = await RoleService.createRole(req.body, operatorId);
+    const userId = req.user._id;
+
+    const role = await RoleService.createRole(req.body, operatorId, userId);
+
     res.status(201).json({ message: 'Role created successfully', role });
   } catch (error) {
+    const userId = req.user?._id;
+
     logger.error('Error in createRole controller', {
       error: error.message,
       stack: error.stack,
-      body: req.body
+      body: req.body,
+      createdBy: userId,
     });
-    
+
     const statusCode = error.statusCode || 500;
     const message = statusCode === 500 ? 'Server error' : error.message;
     res.status(statusCode).json({ message });
@@ -32,13 +38,17 @@ exports.createRole = async (req, res) => {
  */
 exports.getRoles = async (req, res) => {
   try {
-    const roles = await RoleService.getAllRoles();
+    const operatorId = requestContext.getOperatorId();
+
+    const roles = await RoleService.getAllRoles(operatorId);
+
     res.status(200).json({ roles });
   } catch (error) {
     logger.error('Error in getRoles controller', {
       error: error.message,
       stack: error.stack
     });
+
     res.status(500).json({ message: 'Server error' });
   }
 };

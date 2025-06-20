@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Vehicle = require('../models/Vehicle');
 const Operator = require('../models/Operator');
+const logger = require('../utils/logger');
 
 class VehicleService {
  static async getAllVehicles(operatorId) {
@@ -38,25 +39,47 @@ class VehicleService {
     };
   }
 
-  static async createVehicle(operatorId, vehicleData) {
+ static async createVehicle(operatorId, vehicleData, createdBy) {
+    logger.info('Creating new vehicle', { operatorId, vehicleData, createdBy });
+
+    // Check if operator exists
     const operatorExists = await Operator.exists({ _id: operatorId });
-    if (!operatorExists) throw new Error('Operator not found');
+    if (!operatorExists) {
+      logger.warn('Operator not found', { operatorId });
+      throw new Error('Operator not found');
+    }
 
-    const exists = await Vehicle.findOne({ vehicleNumber: vehicleData.vehicleNumber, operatorId });
-    if (exists) throw new Error('Vehicle number already exists');
+    // Check if vehicle number already exists for this operator
+    const exists = await Vehicle.findOne({
+      vehicleNumber: vehicleData.vehicleNumber,
+      operatorId
+    });
 
+    if (exists) {
+      logger.warn('Vehicle number already exists', {
+        vehicleNumber: vehicleData.vehicleNumber,
+        operatorId
+      });
+      throw new Error('Vehicle number already exists');
+    }
+
+    // Validate status or assign default
     const status = vehicleData.status || 'Available';
-    if (!["Available", "In Transit", "Maintenance"].includes(status)) {
+    const validStatuses = ['Available', 'In Transit', 'Maintenance'];
+    if (!validStatuses.includes(status)) {
       throw new Error(`Invalid vehicle status: ${status}`);
     }
 
+    // Create and save vehicle
     const vehicle = new Vehicle({
       ...vehicleData,
       status,
       operatorId,
+      createdBy
     });
 
     await vehicle.save();
+    logger.info('Vehicle created successfully', { vehicleId: vehicle._id });
     return vehicle;
   }
 

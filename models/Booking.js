@@ -1,36 +1,16 @@
 const mongoose = require('mongoose');
 
-const statusUpdateSchema = new mongoose.Schema({
-  status: {
-    type: String,
-    enum: ['Booked', 'Loaded', 'Unloaded', 'Delivered'],
-    required: true
-  },
-  updatedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  vehicleNumber: {
-    type: String,
-    default: null
-  },
-  timestamp: {
-    type: Date,
-    default: Date.now
-  }
-}, { _id: false });
-
 const bookingSchema = new mongoose.Schema({
-  bookingId: { type: String, unique: true },
+  bookingId: { type: String },
   bookingDate: { type: String, index: true },
 
   // Users and operator
   bookedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  loadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  unloadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  deliveredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  loadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  unloadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  deliveredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   operatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Operator', required: true },
 
   // Sender info
@@ -89,13 +69,11 @@ const bookingSchema = new mongoose.Schema({
     required: true
   },
 
-  // Payment Type
   paymentType: {
-    type: String,
-    enum: ['cash', 'UPI'],
-    default: 'cash',
-    required: true
-  }
+  type: String,
+  enum: ['', 'cash', 'UPI'],
+  default: ''
+}
 
 }, { timestamps: true });
 

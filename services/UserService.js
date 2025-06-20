@@ -3,7 +3,6 @@ const Role = require('../models/Role');
 const Branch = require('../models/Branch');
 const bcrypt = require('bcryptjs');
 const requestContext = require('../utils/requestContext');
-const getDailyCargoBalance = require('./CargoBalanceService');
 const logger = require('../utils/logger');
 
 class UserService {
@@ -57,9 +56,14 @@ class UserService {
    * @param {Object} userData - User data
    * @returns {Promise<Object>} Created user
    */
-  static async createUser(userData, currentOperatorId) {
+ static async createUser(userData, currentOperatorId, createdBy) {
   const { mobile, password, role, branchId } = userData;
-  logger.info('Creating new user', { mobile, role, operatorId: userData.operatorId });
+  logger.info('Creating new user', {
+    mobile,
+    role,
+    operatorId: userData.operatorId || currentOperatorId,
+    createdBy
+  });
 
   try {
     // Check if mobile number exists
@@ -85,7 +89,7 @@ class UserService {
       }
     }
 
-    // Determine operatorId: from userData if provided, otherwise fallback
+    // Determine operatorId
     const operatorIdToUse = userData.operatorId || currentOperatorId;
     if (!operatorIdToUse) {
       throw new Error('Operator ID is required');
@@ -104,20 +108,25 @@ class UserService {
       password: hashedPassword,
       status: status || 'Active',
       operatorId: operatorIdToUse,
+      createdBy: createdBy || null,
       cargoBalance: 0,
     });
 
     const savedUser = await newUser.save();
-    const userResponse = savedUser.toObject();
-    delete userResponse.password;
 
-    logger.info('User created successfully', { userId: savedUser._id, mobile });
-    return userResponse;
+    logger.info('User created successfully', {
+      userId: savedUser._id,
+      mobile,
+      createdBy
+    });
+
+    return savedUser; // Return full document with password and timestamps
   } catch (error) {
     logger.error('Error creating user', {
       error: error.message,
       mobile,
       operatorId: userData.operatorId || currentOperatorId,
+      createdBy,
       stack: error.stack
     });
     throw error;

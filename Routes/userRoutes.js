@@ -7,7 +7,6 @@ router.use(passport.authenticate('jwt', { session: false }));
 
 // CRUD routes
 router.get('/', userController.getUsers);
-router.get('/cargoBlance', userController.getDailyCargoBalance);
 router.get('/:id', userController.getUserById);
 router.post('/search', userController.searchUsers);
 router.post('/', userController.createUser);
