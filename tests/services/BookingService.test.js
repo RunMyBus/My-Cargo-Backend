@@ -200,7 +200,7 @@ describe('BookingService', () => {
     });
     
     it('should only allow active branches', async () => {
-      const inactiveBranch = { ...mockFromBranch, status: 'inactive' };
+      const inactiveBranch = { ...mockFromBranch, status: 'Inactive' };
       Branch.findOne.mockImplementationOnce(() => Promise.resolve(inactiveBranch));
       
       await expect(BookingService.createBooking(bookingData, userId, operatorId))

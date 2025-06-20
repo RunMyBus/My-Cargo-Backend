@@ -2,22 +2,34 @@ const Operator = require('../models/Operator');
 logger = require('../utils/logger');
 
 class OperatorService {
-    static async createOperator(operatorData) {
-        // Check if operator with same name or code already exists
-        const existingOperator = await Operator.findOne({
-            $or: [
-                { name: operatorData.name },
-                { code: operatorData.code }
-            ]
-        });
-        if (existingOperator) {
-            logger.error('Operator with this name or code already exists');
-            throw new Error('Operator with this name or code already exists');
-        }
-        const operator = new Operator(operatorData);
-        await operator.save();
-        return operator;
+  static async createOperator(operatorData) {
+    if (operatorData.code) {
+      operatorData.code = operatorData.code.toUpperCase();
     }
+
+    if (!/^[A-Z0-9]{3}$/.test(operatorData.code)) {
+      throw new Error('Code must be exactly 3 characters, containing only uppercase letters and numbers.');
+    }
+    if (!/[A-Z]/.test(operatorData.code)) {
+      throw new Error('Code must contain at least one uppercase letter.');
+    }
+
+    // Check if operator with same code exists
+    const existingCode = await Operator.findOne({ code: operatorData.code });
+    if (existingCode) {
+      throw new Error('Code already exists, try a different code');
+    }
+
+    // Check if operator with same name exists
+    const existingName = await Operator.findOne({ name: operatorData.name });
+    if (existingName) {
+      throw new Error('Operator with this name already exists');
+    }
+
+    const operator = new Operator(operatorData);
+    await operator.save();
+    return operator;
+  }
 
     static async getAllOperators() {
         return await Operator.find();

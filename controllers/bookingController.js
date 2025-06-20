@@ -4,7 +4,6 @@ const logger = require('../utils/logger');
 const requestContext = require('../utils/requestContext');
 const { Parser } = require('json2csv');
 const ExportService = require('../services/ExportService');
-const { getCargoBalance } = require('../services/CargoBalanceService');
 
 
 // Create booking
@@ -65,14 +64,16 @@ exports.getBookingById = async (req, res) => {
 // Update booking by ID
 exports.updateBooking = async (req, res) => {
   try {
-    const operatorId = requestContext.getOperatorId();
+     const operatorId = requestContext.getOperatorId();
+    const userId = req.user._id;
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
     const booking = await BookingService.updateBooking(
       req.params.id, 
       req.body,
-      operatorId
+      operatorId,
+      userId
     );
     res.json(booking);
   } catch (error) {
@@ -91,7 +92,7 @@ exports.deleteBooking = async (req, res) => {
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
-    const result = await BookingService.deleteBooking(req.params.id, operatorId);
+    const result = await BookingService.deleteBooking(req.params.id, operatorId );
     res.json(result);
   } catch (error) {
     if (error.message === 'Booking not found') {
@@ -124,7 +125,7 @@ exports.getUnassignedBookings = async (req, res) => {
 exports.getAssignedBookings = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId();
-    const currentUserId = req.user._id;
+    const userId = req.user._id;
 
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
@@ -132,7 +133,7 @@ exports.getAssignedBookings = async (req, res) => {
 
     const { page = 1, limit = 10, query = "" } = req.body;
 
-    const result = await BookingService.getAssignedBookings(operatorId, currentUserId, page, limit, query);
+    const result = await BookingService.getAssignedBookings(operatorId, userId, page, limit, query);
     res.json(result);
   } catch (error) {
     logger.error('Error getting assigned bookings in controller', { error: error.message });
@@ -144,13 +145,14 @@ exports.getAssignedBookings = async (req, res) => {
 exports.getInTransitBookings = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId();
+    const userId = req.user._id;
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
 
     const { page = 1, limit = 10, query = "" } = req.body;
 
-    const result = await BookingService.getInTransitBookings(operatorId, page, limit, query);
+    const result = await BookingService.getInTransitBookings(operatorId, userId, page, limit, query);
     res.json(result);
   } catch (error) {
     logger.error('Error getting in-transit bookings in controller', { error: error.message });
@@ -162,6 +164,7 @@ exports.getInTransitBookings = async (req, res) => {
 exports.getArrivedBookings = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId();
+    const userId = req.user._id;
 
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
@@ -169,7 +172,7 @@ exports.getArrivedBookings = async (req, res) => {
 
     const { page = 1, limit = 10, query = "" } = req.body;
 
-    const result = await BookingService.getArrivedBookings(operatorId, page, limit, query);
+    const result = await BookingService.getArrivedBookings(operatorId, userId, page, limit, query);
 
     res.json(result);
   } catch (error) {
@@ -306,22 +309,5 @@ exports.exportInTransitBookings = async (req, res) => {
     });
 
     res.status(500).json({ error: 'Failed to export in transit bookings' });
-  }
-};
-
-exports.getCargoBalanceController = async (req, res) => {
-  try {
-    const operatorId = requestContext.getOperatorId();
-    if (!operatorId) {
-      return res.status(400).json({ message: 'Invalid or missing operatorId' });
-    }
-
-    const { startDate, endDate } = req.query;
-    const result = await getCargoBalance(operatorId, startDate, endDate);
-
-    res.status(200).json(result);
-  } catch (error) {
-    logger.error('GET_CARGO_BALANCE_ERROR:', error);
-    res.status(500).json({ message: error.message || 'Internal server error' });
   }
 };
