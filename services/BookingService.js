@@ -193,38 +193,47 @@ static async createBooking(data, userId, operatorId) {
     }
   }
 
-static async updateBooking(id, updateData, operatorId, userId) {
+static async updateBooking(id, updateData, operatorId, currentUserId) {
   logger.info('Updating booking', { 
     bookingId: id, 
     operatorId,
-    updatedBy: userId,
     updateFields: Object.keys(updateData)
   });
-  
+
   try {
     const booking = await Booking.findOne({ _id: id, operatorId });
-    
+
     if (!booking) {
       logger.warn('Booking not found for update', { bookingId: id, operatorId });
       throw new Error('Booking not found');
     }
 
-    // Update status-specific fields
     const newStatus = updateData.status;
+
+    // Handle status-specific user tracking
     if (newStatus === 'Loaded') {
-      booking.loadedBy = userId;
+      booking.loadedBy = currentUserId;
     }
     if (newStatus === 'Unloaded') {
-      booking.unloadedBy = userId;
+      booking.unloadedBy = currentUserId;
     }
     if (newStatus === 'Delivered') {
       booking.deliveredBy = userId;
     }
+    if (newStatus === 'Cancelled') {
+      booking.cancelledBy = currentUserId;
+    }
 
-    // Set who updated the booking
-    booking.updatedBy = userId;
+    // If assigning vehicle for the first time
+    if (
+      updateData.assignedVehicle && 
+      (!booking.assignedVehicle || booking.assignedVehicle.toString() !== updateData.assignedVehicle)
+    ) {
+      booking.assignedVehicle = updateData.assignedVehicle;
+      booking.loadedBy = currentUserId;
+    }
 
-    // Apply other updates
+    // Apply remaining updates (after manual ones)
     Object.assign(booking, updateData);
     booking.updatedAt = new Date();
 
@@ -233,7 +242,10 @@ static async updateBooking(id, updateData, operatorId, userId) {
     logger.info('Successfully updated booking', { 
       bookingId: id, 
       status: booking.status,
-      operatorId 
+      operatorId,
+      assignedVehicle: booking.assignedVehicle,
+      loadedBy: booking.loadedBy,
+      cancelledBy: booking.cancelledBy
     });
 
     return booking;
@@ -360,10 +372,9 @@ static async updateBooking(id, updateData, operatorId, userId) {
   }
 }
 
-  static async getAssignedBookings(operatorId, userId, page = 1, limit = 10, query = "") {
+  static async getAssignedBookings(operatorId, page = 1, limit = 10, query = "") {
     logger.info('Fetching assigned bookings', { 
-      operatorId, 
-      userId,
+      operatorId,
       page, 
       limit, 
       query: query || 'none' 
@@ -392,7 +403,6 @@ static async updateBooking(id, updateData, operatorId, userId) {
       {
         $set: {
           status: 'InTransit',
-          loadedBy: userId,
           updatedAt: new Date()
         },
       }
@@ -402,7 +412,6 @@ static async updateBooking(id, updateData, operatorId, userId) {
       logger.info('Updated bookings status to InTransit', {
         count: updateResult.modifiedCount,
         operatorId,
-        loadedBy: userId
       });
     }
 
@@ -461,7 +470,6 @@ static async updateBooking(id, updateData, operatorId, userId) {
     logger.error('Error getting assigned bookings', {
       error: error.message,
       operatorId,
-      userId,
       page,
       limit,
       query: query || 'none',

@@ -6,7 +6,6 @@ const bookingSchema = new mongoose.Schema({
 
   // Users and operator
   bookedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   loadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   unloadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   deliveredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },

@@ -64,7 +64,7 @@ exports.getBookingById = async (req, res) => {
 // Update booking by ID
 exports.updateBooking = async (req, res) => {
   try {
-     const operatorId = requestContext.getOperatorId();
+    const operatorId = requestContext.getOperatorId();
     const userId = req.user._id;
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
@@ -125,7 +125,6 @@ exports.getUnassignedBookings = async (req, res) => {
 exports.getAssignedBookings = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId();
-    const userId = req.user._id;
 
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
@@ -133,7 +132,7 @@ exports.getAssignedBookings = async (req, res) => {
 
     const { page = 1, limit = 10, query = "" } = req.body;
 
-    const result = await BookingService.getAssignedBookings(operatorId, userId, page, limit, query);
+    const result = await BookingService.getAssignedBookings(operatorId, page, limit, query);
     res.json(result);
   } catch (error) {
     logger.error('Error getting assigned bookings in controller', { error: error.message });
