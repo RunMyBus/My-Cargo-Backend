@@ -397,24 +397,6 @@ static async updateBooking(id, updateData, operatorId, currentUserId) {
         logger.debug('Applied search filter', { filter: baseFilter.$or });
       }
 
-    // Update all matching bookings to 'InTransit' if not already
-    const updateResult = await Booking.updateMany(
-      { ...baseFilter, status: { $ne: 'InTransit' } },
-      {
-        $set: {
-          status: 'InTransit',
-          updatedAt: new Date()
-        },
-      }
-    );
-    
-    if (updateResult.modifiedCount > 0) {
-      logger.info('Updated bookings status to InTransit', {
-        count: updateResult.modifiedCount,
-        operatorId,
-      });
-    }
-
     const [total, rawBookings] = await Promise.all([
       Booking.countDocuments(baseFilter),
       Booking.find(baseFilter)
@@ -503,23 +485,6 @@ static async updateBooking(id, updateData, operatorId, currentUserId) {
           { receiverName: regex }
         ];
         logger.debug('Applied search filter', { filter: baseFilter.$or });
-      }
-
-      const updateResult = await Booking.updateMany(
-      { ...baseFilter, unloadedBy: null },
-      {
-        $set: {
-          unloadedBy: userId,
-          updatedAt: new Date()
-        }
-      });
-
-      if (updateResult.modifiedCount > 0) {
-        logger.info('Updated bookings with unloadedBy user', {
-          count: updateResult.modifiedCount,
-          operatorId,
-          unloadedBy: userId
-        });
       }
 
     const [total, rawBookings] = await Promise.all([
@@ -622,24 +587,6 @@ static async updateBooking(id, updateData, operatorId, currentUserId) {
       }
 
     logger.info('Fetching arrived bookings with filter:', baseFilter);
-
-    const updateResult = await Booking.updateMany(
-      { ...baseFilter, deliveredBy: null },
-      {
-        $set: {
-          deliveredBy: userId,
-          updatedAt: new Date()
-        }
-      }
-    );
-
-    if (updateResult.modifiedCount > 0) {
-      logger.info('Updated bookings with deliveredBy user', {
-        count: updateResult.modifiedCount,
-        operatorId,
-        deliveredBy: userId
-      });
-    }
 
     const [total, rawBookings] = await Promise.all([
       Booking.countDocuments(baseFilter),
