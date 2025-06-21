@@ -1,12 +1,18 @@
+// Import dependencies
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
+const { faker } = require('@faker-js/faker/locale/en_IN');
+const moment = require('moment');
 
 // Load environment variables
 dotenv.config();
 const config = process.env;
 
-// Models
+// Set Faker locale for Indian names and addresses
+faker.locale = 'en_IND';
+
+// Import models
 const Operator = require('../models/Operator');
 const Branch = require('../models/Branch');
 const User = require('../models/User');
@@ -15,10 +21,18 @@ const Permission = require('../models/Permission');
 const Vehicle = require('../models/Vehicle');
 const Booking = require('../models/Booking');
 
-// Connect to MongoDB
+// Constants
+const NUM_OPERATORS = 5;
+const BRANCHES_PER_OPERATOR = 5;
+const USERS_PER_BRANCH = 3;
+const VEHICLES_PER_OPERATOR = 10;
+const MIN_BOOKINGS = 2000;
+const MAX_BOOKINGS = 2500;
+
+// Database connection
 const connectDB = async () => {
   try {
-    let mongoUrl = 'mongodb://' + config.DB_HOST + ':' + config.DB_PORT + '/' + config.DB_NAME;
+    const mongoUrl = `mongodb://${config.DB_HOST}:${config.DB_PORT}/${config.DB_NAME}`;
     await mongoose.connect(mongoUrl, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
@@ -30,7 +44,7 @@ const connectDB = async () => {
   }
 };
 
-// Hash password helper
+// Password hashing helper
 const hashPassword = async (password) => {
   const salt = await bcrypt.genSalt(10);
   return await bcrypt.hash(password, salt);
@@ -53,7 +67,7 @@ const clearData = async () => {
 const seedData = async () => {
   try {
     await connectDB();
-    await clearData();
+    //await clearData();
 
     console.log('Seeding data...');
 
@@ -63,539 +77,501 @@ const seedData = async () => {
       { name: 'manage_roles', description: 'Can manage roles' },
       { name: 'manage_bookings', description: 'Can manage bookings' },
       { name: 'manage_branches', description: 'Can manage branches' },
+      { name: 'manage_vehicles', description: 'Can manage vehicles' },
       { name: 'view_reports', description: 'Can view reports' },
+      { name: 'manage_operators', description: 'Can manage operators' },
+      { name: 'manage_pricing', description: 'Can manage pricing' },
+      { name: 'manage_inventory', description: 'Can manage inventory' },
+      { name: 'manage_payments', description: 'Can manage payments' },
     ];
 
     const createdPermissions = await Permission.insertMany(permissions);
     console.log(`Created ${createdPermissions.length} permissions`);
 
-    // 2. Create Operator
-    const operator = await Operator.create({
-      name: 'Speedy Cargo',
-      code: 'SPD',
-      address: '123 Main St, Mumbai, India',
-      phone: '+911234567890',
-      status: 'Active',
-      bookingSequence: 1000,
-      paymentOptions: ['cash', 'UPI'],
-    });
-    console.log(`Created operator: ${operator.name}`);
-
-    // 3. Create Roles
-    const adminRole = await Role.create({
-      rolecode: '0001',
-      rolename: 'Admin',
-      description: 'Administrator with full access',
-      permissions: createdPermissions.map(p => p._id),
-      operatorId: operator._id,
-    });
-
-    const managerRole = await Role.create({
-      rolecode: '0002',
-      rolename: 'Branch Manager',
-      description: 'Branch manager with limited access',
-      permissions: createdPermissions
-        .filter(p => !['manage_roles', 'manage_users'].includes(p.name))
-        .map(p => p._id),
-      operatorId: operator._id,
-    });
-
-    const staffRole = await Role.create({
-      rolecode: '0003',
-      rolename: 'Staff',
-      description: 'Staff member with basic access',
-      permissions: createdPermissions
-        .filter(p => ['view_reports', 'manage_bookings'].includes(p.name))
-        .map(p => p._id),
-      operatorId: operator._id,
-    });
-
-    console.log(`Created ${await Role.countDocuments()} roles`);
-
-    // 4. Create Branches
-    const branches = [
-      {
-        name: 'Mumbai Central',
-        address: 'Mumbai Central, Mumbai, Maharashtra',
-        phone: '+912234561234',
-        manager: 'Rajesh Kumar',
-        status: 'Active',
-        operatorId: operator._id,
-      },
-      {
-        name: 'Delhi NCR',
-        address: 'Connaught Place, New Delhi',
-        phone: '+911123456789',
-        manager: 'Priya Singh',
-        status: 'Active',
-        operatorId: operator._id,
-      },
-      {
-        name: 'Bangalore South',
-        address: 'Koramangala, Bangalore, Karnataka',
-        phone: '+918067543210',
-        manager: 'Arun Mehta',
-        status: 'Active',
-        operatorId: operator._id,
-      },
+    // 2. Create Multiple Operators
+    const operatorNames = [
+      'Speedy Cargo',
+      'Swift Logistics',
+      'Rapid Transport',
+      'Quick Cargo',
+      'Express Freight'
     ];
 
-    const createdBranches = await Branch.insertMany(branches);
-    console.log(`Created ${createdBranches.length} branches`);
+    const operators = [];
+    for (let i = 0; i < NUM_OPERATORS; i++) {
+      const operator = await Operator.create({
+        name: operatorNames[i],
+        code: operatorNames[i].split(' ').map(w => w[0]).join('').toUpperCase(),
+        address: `${faker.location.streetAddress()}, ${faker.location.city()}, ${faker.location.state()}, India`,
+        phone: `+91${faker.phone.number('##########')}`,
+        status: 'Active',
+        bookingSequence: 1000,
+        paymentOptions: ['cash', 'UPI'],
+      });
+      operators.push(operator);
+    }
 
-    // 5. Create Users
-    const users = [
+    // 3. Create Roles for each operator
+    const allRoles = [];
+    const roleTemplates = [
       {
-        fullName: 'Admin User',
-        mobile: '9876543210',
+        rolename: 'Admin',
+        description: 'Administrator with full access',
+        permissions: createdPermissions.map(p => p._id)
+      },
+      {
+        rolename: 'Branch Manager',
+        description: 'Branch manager with limited access',
+        permissions: createdPermissions
+          .filter(p => !['manage_roles', 'manage_users', 'manage_operators'].includes(p.name))
+          .map(p => p._id)
+      },
+      {
+        rolename: 'Staff',
+        description: 'Staff member with basic access',
+        permissions: createdPermissions
+          .filter(p => ['view_reports', 'manage_bookings', 'manage_vehicles'].includes(p.name))
+          .map(p => p._id)
+      },
+      {
+        rolename: 'Driver',
+        description: 'Driver with delivery access',
+        permissions: createdPermissions
+          .filter(p => ['manage_bookings'].includes(p.name))
+          .map(p => p._id)
+      }
+    ];
+
+    // Get all permissions
+    const allPermissions = await Permission.find({});
+
+    for (const operator of operators) {
+      for (const template of roleTemplates) {
+        const role = await Role.create({
+          rolename: template.rolename,
+          description: template.description,
+          permissions: allPermissions.map(p => p._id), // Assign all permissions for now
+          operatorId: operator._id
+        });
+        allRoles.push(role);
+      }
+    }
+    console.log(`Created ${await Role.countDocuments()} roles`);
+
+    // 4. Create Branches for each operator
+    const cities = [
+      'Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai',
+      'Kolkata', 'Pune', 'Ahmedabad', 'Jaipur', 'Surat',
+      'Lucknow', 'Kanpur', 'Nagpur', 'Visakhapatnam', 'Indore',
+      'Thane', 'Bhopal', 'Patna', 'Vadodara', 'Ghaziabad'
+    ];
+
+    const allBranches = [];
+    for (const operator of operators) {
+      const operatorBranches = [];
+      const operatorCities = faker.helpers.shuffle([...cities]).slice(0, BRANCHES_PER_OPERATOR);
+      
+      for (let i = 0; i < operatorCities.length; i++) {
+        const city = operatorCities[i];
+        const branch = await Branch.create({
+          name: `${city} ${faker.company.buzzAdjective()} Branch`,
+          address: `${faker.location.streetAddress()}, ${city}, India`,
+          phone: `+91${faker.phone.number('##########')}`,
+          manager: faker.person.fullName(),
+          status: 'Active',
+          operatorId: operator._id,
+          email: `branch.${city.toLowerCase()}@${operator.name.toLowerCase().replace(/\s+/g, '')}.com`
+        });
+        operatorBranches.push(branch);
+        allBranches.push(branch);
+      }
+    }
+    console.log(`Total branches created: ${allBranches.length}`);
+
+    // 5. Create Users for each branch
+    const allUsers = [];
+    const operatorAdminUsers = [];
+    
+    // Create admin user for each operator
+    for (const operator of operators) {
+      const adminRole = await Role.findOne({ operatorId: operator._id, rolename: 'Admin' });
+      const firstBranch = await Branch.findOne({ operatorId: operator._id });
+      
+      if (!adminRole) {
+        console.error(`No admin role found for operator ${operator.name}`);
+        continue;
+      }
+      if (!firstBranch) {
+        console.error(`No branch found for operator ${operator.name}`);
+        continue;
+      }
+      
+      const adminUser = await User.create({
+        fullName: `${operator.name} Admin`,
+        mobile: `9${faker.phone.number('#########')}`,
         password: await hashPassword('admin123'),
-        branchId: createdBranches[0]._id,
+        branchId: firstBranch._id,
         role: adminRole._id,
         status: 'Active',
         operatorId: operator._id,
-        cargoBalance: 10000,
-      },
-      {
-        fullName: 'Mumbai Manager',
-        mobile: '9876543211',
+        email: `admin@${operator.name.toLowerCase().replace(/\s+/g, '')}.com`,
+        cargoBalance: 100000,
+      });
+      operatorAdminUsers.push(adminUser);
+      allUsers.push(adminUser);
+    }
+    
+    // Create managers, staff, and drivers for each branch
+    for (const branch of allBranches) {
+      const operator = operators.find(op => op._id.toString() === branch.operatorId.toString());
+      const managerRole = await Role.findOne({ operatorId: operator._id, rolename: 'Branch Manager' });
+      const staffRole = await Role.findOne({ operatorId: operator._id, rolename: 'Staff' });
+      const driverRole = await Role.findOne({ operatorId: operator._id, rolename: 'Driver' });
+      
+      // Create branch manager
+      const manager = await User.create({
+        fullName: `Manager ${faker.person.lastName()}`,
+        mobile: `9${faker.phone.number('#########')}`,
         password: await hashPassword('manager123'),
-        branchId: createdBranches[0]._id,
+        branchId: branch._id,
         role: managerRole._id,
         status: 'Active',
         operatorId: operator._id,
-        cargoBalance: 5000,
-      },
-      {
-        fullName: 'Delhi Manager',
-        mobile: '9876543212',
-        password: await hashPassword('manager123'),
-        branchId: createdBranches[1]._id,
-        role: managerRole._id,
-        status: 'Active',
-        operatorId: operator._id,
-        cargoBalance: 5000,
-      },
-      {
-        fullName: 'Mumbai Staff',
-        mobile: '9876543213',
-        password: await hashPassword('staff123'),
-        branchId: createdBranches[0]._id,
-        role: staffRole._id,
-        status: 'Active',
-        operatorId: operator._id,
-        cargoBalance: 1000,
-      },
+        email: `manager.${branch.name.toLowerCase().replace(/\s+/g, '')}@${operator.name.toLowerCase().replace(/\s+/g, '')}.com`,
+        cargoBalance: 50000,
+      });
+      allUsers.push(manager);
+      
+      // Create staff members
+      for (let i = 0; i < USERS_PER_BRANCH; i++) {
+        const isStaff = Math.random() > 0.5; // 50% chance of being staff vs driver
+        const role = isStaff ? staffRole : driverRole;
+        const user = await User.create({
+          fullName: faker.person.fullName(),
+          mobile: `9${faker.number.int({ min: 100000000, max: 999999999 })}`,
+          password: await hashPassword('password123'),
+          branchId: branch._id,
+          role: role._id,
+          status: 'Active',
+          operatorId: operator._id,
+          email: `${faker.person.fullName()}@${operator.name.toLowerCase().replace(/\s+/g, '')}.com`,
+          cargoBalance: isStaff ? 10000 : 0,
+        });
+        allUsers.push(user);
+      }
+
+    }
+    console.log(`Total users created: ${allUsers.length}`);
+
+    // 6. Create Vehicles for each operator
+    const allVehicles = [];
+    const vehicleTypes = [
+      { type: 'Truck', capacity: '5000 kg' },
+      { type: 'Mini Truck', capacity: '2000 kg' },
+      { type: 'Pickup', capacity: '1000 kg' },
+      { type: 'Tempo', capacity: '1500 kg' },
+      { type: 'Bike', capacity: '50 kg' },
+      { type: 'Van', capacity: '800 kg' },
+      { type: 'Trailer', capacity: '10000 kg' },
     ];
+    const stateCodes = ['MH', 'DL', 'KA', 'TN', 'AP', 'TS', 'GJ', 'RJ', 'UP', 'WB'];
+    
+    for (const operator of operators) {
+      const operatorBranches = allBranches.filter(b => b.operatorId.toString() === operator._id.toString());
+      
+      // Find drivers for this operator
+      const driverRole = await Role.findOne({ operatorId: operator._id, rolename: 'Driver' });
+      if (!driverRole) {
+        console.error(`No Driver role found for operator ${operator.name}`);
+        continue;
+      }
+      
+      const drivers = allUsers.filter(u => 
+        u.operatorId && 
+        u.operatorId.toString() === operator._id.toString() &&
+        u.role && 
+        u.role.toString() === driverRole._id.toString()
+      );
+      
+      for (let i = 0; i < VEHICLES_PER_OPERATOR; i++) {
+        const vehicleType = faker.helpers.arrayElement(vehicleTypes);
+        const stateCode = faker.helpers.arrayElement(stateCodes);
+        const vehicleNumber = `${stateCode}${faker.number.int({ min: 1, max: 99 }).toString().padStart(2, '0')}` +
+          `${String.fromCharCode(65 + Math.floor(Math.random() * 26))}${String.fromCharCode(65 + Math.floor(Math.random() * 26))}` +
+          `${faker.number.int({ min: 1000, max: 9999 })}`;
+        
+        const statuses = ['Available', 'In Transit', 'Maintenance'];
+        const status = faker.helpers.arrayElement(statuses);
+        const currentBranch = faker.helpers.arrayElement(operatorBranches);
+        const driver = drivers.length > 0 ? faker.helpers.arrayElement(drivers) : null;
+        
+        const vehicle = await Vehicle.create({
+          vehicleNumber: vehicleNumber,
+          type: vehicleType.type,
+          capacity: vehicleType.capacity,
+          driver: driver ? driver.fullName : 'Unassigned',
+          driverId: driver ? driver._id : null,
+          status: status,
+          currentLocation: currentBranch.name,
+          currentBranchId: currentBranch._id,
+          operatorId: operator._id,
+          lastMaintenanceDate: faker.date.past({ years: 1 }),
+          nextMaintenanceDate: faker.date.soon({ days: 180 }),
+          insuranceExpiry: faker.date.soon({ days: 365 }),
+          registrationNumber: vehicleNumber,
+          model: `${faker.vehicle.manufacturer()} ${faker.vehicle.model()}`,
+          year: faker.date.past({ years: 10 }).getFullYear(),
+          color: faker.vehicle.color(),
+        });
+        
+        allVehicles.push(vehicle);
+      }
 
-    const createdUsers = await User.insertMany(users);
-    console.log(`Created ${createdUsers.length} users`);
+    }
+    console.log(`Total vehicles created: ${allVehicles.length}`);
 
-    // 6. Create Vehicles
-    const vehicles = [
-      {
-        vehicleNumber: 'MH01AB1234',
-        type: 'Truck',
-        capacity: '2000 kg',
-        driver: 'Ramesh Kumar',
-        status: 'Available',
-        currentLocation: 'Mumbai',
-        operatorId: operator._id,
-      },
-      {
-        vehicleNumber: 'DL01CD5678',
-        type: 'Pickup',
-        capacity: '500 kg',
-        driver: 'Suresh Patel',
-        status: 'Available',
-        currentLocation: 'Delhi',
-        operatorId: operator._id,
-      },
-      {
-        vehicleNumber: 'KA01EF9012',
-        type: 'Tempo',
-        capacity: '1000 kg',
-        driver: 'Mahesh Iyer',
-        status: 'In Transit',
-        currentLocation: 'Bangalore',
-        operatorId: operator._id,
-      },
-    ];
-
-    const createdVehicles = await Vehicle.insertMany(vehicles);
-    console.log(`Created ${createdVehicles.length} vehicles`);
-
-    // 7. Create Bookings
-    // Helper function to generate booking dates
-    const generateBookingDate = (daysAgo) => {
-      return new Date(Date.now() - (daysAgo * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+    // 7. Create Bookings - Generate 2000-2500 bookings over last 6 months
+    const numBookings = faker.number.int({ min: MIN_BOOKINGS, max: MAX_BOOKINGS });
+    const packageTypes = ['Electronics', 'Clothing', 'Documents', 'Furniture', 'Food', 'Medical', 'Automotive', 'Industrial', 'Retail', 'Personal'];
+    const statuses = ['Booked', 'InTransit', 'Cancelled', 'Arrived', 'Delivered'];
+    const lrTypes = ['Paid', 'ToPay'];
+    const paymentModes = ['cash', 'UPI'];
+    const bookingSources = ['Web', 'Mobile', 'Walk-in', 'Call', 'Email', 'Partner'];
+    const currentDay = moment().format('YYYY-MM-DD');
+    
+    // Helper function to generate a random date within the last 6 months
+    const randomDate = (includeCurrent = false) => {
+      const sixMonthsAgo = moment().subtract(6, 'months').toDate();
+      if (includeCurrent && Math.random() < 0.1) { // 10% chance for current date
+        return currentDay;
+      }
+      return faker.date.between({ from: sixMonthsAgo, to: new Date() });
     };
+    
+    // Helper function to generate a random tracking number
+    const generateTrackingNumber = (operatorCode, sequence) => {
+      const date = moment().format('YYMMDD');
+      return `${operatorCode}${date}${sequence.toString().padStart(6, '0')}`;
+    };
+    
+    // Group users and branches by operator for faster access
+    const usersByOperator = {};
+    const branchesByOperator = {};
+    const vehiclesByOperator = {};
+    
+    for (const operator of operators) {
+      const operatorId = operator._id.toString();
+      usersByOperator[operatorId] = allUsers.filter(u => u.operatorId.toString() === operatorId);
+      branchesByOperator[operatorId] = allBranches.filter(b => b.operatorId.toString() === operatorId);
+      vehiclesByOperator[operatorId] = allVehicles.filter(v => v.operatorId.toString() === operatorId);
+    }
+    // Process bookings in batches to avoid memory issues
+    const batchSize = 100;
+    let bookingCount = 0;
+    const operatorSequence = {};
+    const branchBookings = new Map(); // Track bookings per branch
+    
+    // Initialize sequence counters for each operator
+    for (const operator of operators) {
+      operatorSequence[operator._id.toString()] = 1000; // Start sequence from 1000 for each operator
+    }
+    
+    // Initialize branch bookings tracking
+    for (const operator of operators) {
+      const operatorBranches = branchesByOperator[operator._id.toString()];
+      for (const branch of operatorBranches) {
+        branchBookings.set(branch._id.toString(), {
+          paid: 0,
+          toPay: 0,
+          total: 0
+        });
+      }
+    }
 
-    const bookingTemplates = [
-      // Initial bookings
-      {
-        bookingDate: generateBookingDate(2),
-        senderName: 'Amit Shah',
-        senderPhone: '9876543220',
-        senderEmail: 'amit.shah@example.com',
-        senderAddress: '101, LBS Road, Mumbai',
-        receiverName: 'Neha Gupta',
-        receiverPhone: '9876543221',
-        receiverEmail: 'neha.gupta@example.com',
-        receiverAddress: '45, Connaught Place, New Delhi',
-        fromOffice: createdBranches[0]._id,  // Mumbai
-        toOffice: createdBranches[1]._id,    // Delhi
-        packageDescription: 'Electronics',
-        weight: 10,
-        quantity: 2,
-        valueOfGoods: 25000,
-        dimensions: '20x15x10 cm',
-        status: 'Booked',
-        lrType: 'Paid',
-        bookedBy: createdUsers[1]._id,  // Mumbai Manager
-      },
-      {
-        bookingDate: generateBookingDate(2),
-        senderName: 'Rahul Verma',
-        senderPhone: '9876543222',
-        senderEmail: 'rahul.v@example.com',
-        senderAddress: '22, Hauz Khas, Delhi',
-        receiverName: 'Priya Nair',
-        receiverPhone: '9876543223',
-        receiverEmail: 'priya.n@example.com',
-        receiverAddress: '33, MG Road, Bangalore',
-        fromOffice: createdBranches[1]._id,  // Delhi
-        toOffice: createdBranches[2]._id,    // Bangalore
-        packageDescription: 'Clothing',
-        weight: 5,
-        quantity: 3,
-        valueOfGoods: 8000,
-        dimensions: '30x20x15 cm',
-        status: 'InTransit',
-        lrType: 'ToPay',
-        bookedBy: createdUsers[2]._id,  // Delhi Manager
-        assignedVehicle: createdVehicles[2]._id,  // KA01EF9012
-      },
-      // 20 more diverse bookings
-      {
-        bookingDate: generateBookingDate(1),
-        senderName: 'Vikram Mehta',
-        senderPhone: '9876543230',
-        senderEmail: 'vikram.m@example.com',
-        senderAddress: '56, Andheri East, Mumbai',
-        receiverName: 'Anjali Kapoor',
-        receiverPhone: '9876543231',
-        receiverEmail: 'anjali.k@example.com',
-        receiverAddress: '78, Rajouri Garden, Delhi',
-        fromOffice: createdBranches[0]._id,  // Mumbai
-        toOffice: createdBranches[1]._id,    // Delhi
-        packageDescription: 'Documents',
-        weight: 0.5,
-        quantity: 1,
-        valueOfGoods: 1000,
-        dimensions: '30x20x2 cm',
-        status: 'Delivered',
-        lrType: 'Paid',
-        bookedBy: createdUsers[1]._id,  // Mumbai Manager
-        assignedVehicle: createdVehicles[0]._id,  // MH01AB1234
-        deliveredBy: createdUsers[1]._id,  // Delhi Manager
-        deliveryDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        bookingDate: generateBookingDate(1),
-        senderName: 'Rajesh Khanna',
-        senderPhone: '9876543232',
-        senderEmail: 'rajesh.k@example.com',
-        senderAddress: '12, Churchgate, Mumbai',
-        receiverName: 'Meena Desai',
-        receiverPhone: '9876543233',
-        receiverEmail: 'meena.d@example.com',
-        receiverAddress: '34, Karol Bagh, Delhi',
-        fromOffice: createdBranches[0]._id,  // Mumbai
-        toOffice: createdBranches[1]._id,    // Delhi
-        packageDescription: 'Jewelry',
-        weight: 0.2,
-        quantity: 1,
-        valueOfGoods: 150000,
-        dimensions: '10x5x3 cm',
-        status: 'Booked',
-        lrType: 'Paid',
-        bookedBy: createdUsers[1]._id,  // Mumbai Manager
-      },
-      {
-        bookingDate: generateBookingDate(1),
-        senderName: 'Priyanka Sharma',
-        senderPhone: '9876543234',
-        senderEmail: 'priyanka.s@example.com',
-        senderAddress: '89, Bandra West, Mumbai',
-        receiverName: 'Rahul Malhotra',
-        receiverPhone: '9876543235',
-        receiverEmail: 'rahul.m@example.com',
-        receiverAddress: '67, Saket, Delhi',
-        fromOffice: createdBranches[0]._id,  // Mumbai
-        toOffice: createdBranches[1]._id,    // Delhi
-        packageDescription: 'Gifts',
-        weight: 3,
-        quantity: 5,
-        valueOfGoods: 12000,
-        dimensions: '25x20x15 cm',
-        status: 'InTransit',
-        lrType: 'ToPay',
-        bookedBy: createdUsers[1]._id,  // Mumbai Manager
-        assignedVehicle: createdVehicles[0]._id,  // MH01AB1234
-      },
-      {
-        bookingDate: generateBookingDate(0),
-        senderName: 'Arun Joshi',
-        senderPhone: '9876543236',
-        senderEmail: 'arun.j@example.com',
-        senderAddress: '45, Malad West, Mumbai',
-        receiverName: 'Kavita Reddy',
-        receiverPhone: '9876543237',
-        receiverEmail: 'kavita.r@example.com',
-        receiverAddress: '23, Indiranagar, Bangalore',
-        fromOffice: createdBranches[0]._id,  // Mumbai
-        toOffice: createdBranches[2]._id,    // Bangalore
-        packageDescription: 'Electronics',
-        weight: 8,
-        quantity: 1,
-        valueOfGoods: 45000,
-        dimensions: '40x30x20 cm',
-        status: 'Arrived',
-        lrType: 'Paid',
-        bookedBy: createdUsers[1]._id,  // Mumbai Manager
-        assignedVehicle: createdVehicles[2]._id,  // KA01EF9012
-        arrivalDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        bookingDate: generateBookingDate(0),
-        senderName: 'Sanjay Patel',
-        senderPhone: '9876543238',
-        senderEmail: 'sanjay.p@example.com',
-        senderAddress: '78, Vashi, Navi Mumbai',
-        receiverName: 'Anita Deshmukh',
-        receiverPhone: '9876543239',
-        receiverEmail: 'anita.d@example.com',
-        receiverAddress: '12, Whitefield, Bangalore',
-        fromOffice: createdBranches[0]._id,  // Mumbai
-        toOffice: createdBranches[2]._id,    // Bangalore
-        packageDescription: 'Clothing',
-        weight: 6,
-        quantity: 4,
-        valueOfGoods: 18000,
-        dimensions: '35x25x15 cm',
-        status: 'Cancelled',
-        lrType: 'Paid',
-        bookedBy: createdUsers[1]._id,  // Mumbai Manager
-        cancellationReason: 'Customer requested cancellation',
-      },
-      {
-        bookingDate: generateBookingDate(0),
-        senderName: 'Neha Kapoor',
-        senderPhone: '9876543240',
-        senderEmail: 'neha.k@example.com',
-        senderAddress: '34, Connaught Place, Delhi',
-        receiverName: 'Ravi Shastri',
-        receiverPhone: '9876543241',
-        receiverEmail: 'ravi.s@example.com',
-        receiverAddress: '56, Juhu, Mumbai',
-        fromOffice: createdBranches[1]._id,  // Delhi
-        toOffice: createdBranches[0]._id,    // Mumbai
-        packageDescription: 'Documents',
-        weight: 0.3,
-        quantity: 1,
-        valueOfGoods: 500,
-        dimensions: '25x15x1 cm',
-        status: 'Delivered',
-        lrType: 'Paid',
-        bookedBy: createdUsers[2]._id,  // Delhi Manager
-        assignedVehicle: createdVehicles[0]._id,  // MH01AB1234
-        deliveredBy: createdUsers[1]._id,
-        deliveryDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        bookingDate: generateBookingDate(2),
-        senderName: 'Rakesh Malhotra',
-        senderPhone: '9876543242',
-        senderEmail: 'rakesh.m@example.com',
-        senderAddress: '67, Gurgaon, Haryana',
-        receiverName: 'Sunita Iyer',
-        receiverPhone: '9876543243',
-        receiverEmail: 'sunita.i@example.com',
-        receiverAddress: '89, Electronic City, Bangalore',
-        fromOffice: createdBranches[1]._id,  // Delhi
-        toOffice: createdBranches[2]._id,    // Bangalore
-        packageDescription: 'Electronics',
-        weight: 12,
-        quantity: 1,
-        valueOfGoods: 65000,
-        dimensions: '50x40x30 cm',
-        status: 'InTransit',
-        lrType: 'ToPay',
-        bookedBy: createdUsers[2]._id,  // Delhi Manager
-        assignedVehicle: createdVehicles[2]._id,  // KA01EF9012
-      },
-      {
-        bookingDate: generateBookingDate(1),
-        senderName: 'Manoj Kumar',
-        senderPhone: '9876543244',
-        senderEmail: 'manoj.k@example.com',
-        senderAddress: '23, Noida, UP',
-        receiverName: 'Pooja Sharma',
-        receiverPhone: '9876543245',
-        receiverEmail: 'pooja.s@example.com',
-        receiverAddress: '45, Andheri East, Mumbai',
-        fromOffice: createdBranches[1]._id,  // Delhi
-        toOffice: createdBranches[0]._id,    // Mumbai
-        packageDescription: 'Gifts',
-        weight: 4,
-        quantity: 3,
-        valueOfGoods: 15000,
-        dimensions: '30x20x15 cm',
-        status: 'Booked',
-        lrType: 'Paid',
-        bookedBy: createdUsers[2]._id,  // Delhi Manager
-      },
-      {
-        bookingDate: generateBookingDate(2),
-        senderName: 'Anil Kapoor',
-        senderPhone: '9876543246',
-        senderEmail: 'anil.k@example.com',
-        senderAddress: '56, Indiranagar, Bangalore',
-        receiverName: 'Rekha Verma',
-        receiverPhone: '9876543247',
-        receiverEmail: 'rekha.v@example.com',
-        receiverAddress: '78, Malad West, Mumbai',
-        fromOffice: createdBranches[2]._id,  // Bangalore
-        toOffice: createdBranches[0]._id,    // Mumbai
-        packageDescription: 'Clothing',
-        weight: 7,
-        quantity: 5,
-        valueOfGoods: 22000,
-        dimensions: '35x25x20 cm',
-        status: 'InTransit',
-        lrType: 'ToPay',
-        bookedBy: createdUsers[3]._id,  // Mumbai Staff
-        assignedVehicle: createdVehicles[0]._id,  // MH01AB1234
-      },
-      {
-        bookingDate: generateBookingDate(1),
-        senderName: 'Suresh Reddy',
-        senderPhone: '9876543248',
-        senderEmail: 'suresh.r@example.com',
-        senderAddress: '34, Koramangala, Bangalore',
-        receiverName: 'Anand Desai',
-        receiverPhone: '9876543249',
-        receiverEmail: 'anand.d@example.com',
-        receiverAddress: '12, Connaught Place, Delhi',
-        fromOffice: createdBranches[2]._id,  // Bangalore
-        toOffice: createdBranches[1]._id,    // Delhi
-        packageDescription: 'Electronics',
-        weight: 15,
-        quantity: 2,
-        valueOfGoods: 85000,
-        dimensions: '60x40x30 cm',
-        status: 'Booked',
-        lrType: 'Paid',
-        bookedBy: createdUsers[3]._id,  // Mumbai Staff
-      },
-      {
-        bookingDate: generateBookingDate(0),
-        senderName: 'Priya Singh',
-        senderPhone: '9876543250',
-        senderEmail: 'priya.s@example.com',
-        senderAddress: '78, Whitefield, Bangalore',
-        receiverName: 'Rahul Khanna',
-        receiverPhone: '9876543251',
-        receiverEmail: 'rahul.k@example.com',
-        receiverAddress: '45, Saket, Delhi',
-        fromOffice: createdBranches[2]._id,  // Bangalore
-        toOffice: createdBranches[1]._id,    // Delhi
-        packageDescription: 'Gadgets',
-        weight: 3,
-        quantity: 2,
-        valueOfGoods: 35000,
-        dimensions: '25x15x10 cm',
-        status: 'Arrived',
-        lrType: 'Paid',
-        bookedBy: createdUsers[3]._id,  // Mumbai Staff
-        assignedVehicle: createdVehicles[1]._id,  // DL01CD5678
-        arrivalDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        bookingDate: generateBookingDate(2),
-        senderName: 'Vijay Kumar',
-        senderPhone: '9876543252',
-        senderEmail: 'vijay.k@example.com',
-        senderAddress: '56, Marathahalli, Bangalore',
-        receiverName: 'Sunita Patel',
-        receiverPhone: '9876543253',
-        receiverEmail: 'sunita.p@example.com',
-        receiverAddress: '67, Andheri East, Mumbai',
-        fromOffice: createdBranches[2]._id,  // Bangalore
-        toOffice: createdBranches[0]._id,    // Mumbai
-        packageDescription: 'Clothing',
-        weight: 8,
-        quantity: 6,
-        valueOfGoods: 28000,
-        dimensions: '40x30x20 cm',
-        status: 'Delivered',
-        lrType: 'ToPay',
-        bookedBy: createdUsers[3]._id,  // Mumbai Staff
-        assignedVehicle: createdVehicles[0]._id,  // MH01AB1234
-        deliveredBy: createdUsers[1]._id,  // Mumbai Staff
-        deliveryDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-      // Add more bookings as needed...
-    ];
+    // Add a debug function to check LR type distribution
+    const debugLRDistribution = () => {
+      console.log('\nLR Type Distribution:');
+      console.log('Branch ID\tPaid\tToPay\tTotal\tRatio');
+      branchBookings.forEach((stats, branchId) => {
+        const total = stats.paid + stats.toPay;
+        const ratio = total > 0 ? (stats.toPay / total * 100).toFixed(1) : 0;
+        console.log(`${branchId}\t${stats.paid}\t${stats.toPay}\t${total}\t${ratio}%`);
+      });
+    };
+    
+    while (bookingCount < numBookings) {
+      const currentBatchSize = Math.min(batchSize, numBookings - bookingCount);
+      const bookingBatch = [];
 
-    // Process bookings and add calculated fields
-    const bookings = bookingTemplates.map((booking, index) => {
-      // Find branch indices for distance calculation
-      const fromBranchIndex = createdBranches.findIndex(b => b._id.equals(booking.fromOffice));
-      const toBranchIndex = createdBranches.findIndex(b => b._id.equals(booking.toOffice));
+      // Debug LR distribution every 1000 bookings
+      if (bookingCount % 1000 === 0 && bookingCount > 0) {
+        debugLRDistribution();
+      }
       
-      // Calculate charges based on weight, distance, and package value
-      const distance = [
-        [0, 1400, 1000],  // Mumbai to [Mumbai, Delhi, Bangalore]
-        [1400, 0, 2200],  // Delhi to [Mumbai, Delhi, Bangalore]
-        [1000, 2200, 0]   // Bangalore to [Mumbai, Delhi, Bangalore]
-      ][fromBranchIndex][toBranchIndex];
+      for (let i = 0; i < currentBatchSize; i++) {
+        // Select a random operator
+        const operator = faker.helpers.arrayElement(operators);
+        const operatorUsers = usersByOperator[operator._id.toString()];
+        const operatorBranches = branchesByOperator[operator._id.toString()];
+        const operatorVehicles = vehiclesByOperator[operator._id.toString()];
+        
+        if (operatorUsers.length === 0 || operatorBranches.length < 2) continue; // Skip if not enough data
+        
+        // Select random from and to branches (must be different)
+        let fromBranch, toBranch;
+        do {
+          fromBranch = faker.helpers.arrayElement(operatorBranches);
+          toBranch = faker.helpers.arrayElement(operatorBranches);
+        } while (fromBranch._id.toString() === toBranch._id.toString());
+        
+        // Determine LR type - alternate between Paid and ToPay for better distribution
+        const lrType = bookingCount % 2 === 0 ? 'Paid' : 'ToPay';
+        
+        // Update branch statistics
+        const branchStats = branchBookings.get(fromBranch._id.toString());
+        branchStats[lrType.toLowerCase()]++;
+        branchStats.total++;
+        branchBookings.set(fromBranch._id.toString(), branchStats); // Save updated stats back to Map
+        
+        // Increment and get the next sequence number for this operator
+        const sequence = operatorSequence[operator._id.toString()]++;
+        const trackingNumber = generateTrackingNumber(operator.code, sequence);
+        
+        // Generate random booking date within last 6 months
+        let bookingDate = randomDate(true);
+        const bookingMoment = moment(bookingDate);
+        bookingDate = bookingMoment.format('YYYY-MM-DD');
+        
+        // Select random user who made the booking (filter by operator and branch)
+        const branchUsers = operatorUsers.filter(u => u.branchId.toString() === fromBranch._id.toString());
+        if (branchUsers.length === 0) continue; // Skip if no users in this branch
+        
+        const bookedBy = faker.helpers.arrayElement(branchUsers);
+        
+        // Generate random package details
+        const packageType = faker.helpers.arrayElement(packageTypes);
+        const weight = faker.number.float({ min: 0.5, max: 50, precision: 0.1 });
+        const quantity = faker.number.int({ min: 1, max: 10 });
+        const valueOfGoods = faker.number.int({ min: 100, max: 100000 });
+        const dimensions = `${faker.number.int({ min: 10, max: 100 })}x` +
+                         `${faker.number.int({ min: 10, max: 100 })}x` +
+                         `${faker.number.int({ min: 5, max: 50 })} cm`;
+        
+        // Determine status and related dates
+        const status = faker.helpers.arrayElement(statuses);
+        const paymentMode = faker.helpers.arrayElement(paymentModes);
+        const source = faker.helpers.arrayElement(bookingSources);
+        
+        // Generate dates based on status
+        let pickupDate, inTransitDate, arrivedDate, outForDeliveryDate, deliveredDate, cancelledDate, returnDate;
+        
+        if (['InTransit', 'Arrived', 'OutForDelivery', 'Delivered', 'Returned'].includes(status)) {
+          pickupDate = faker.date.between({ from: bookingDate, to: moment(bookingDate).add(1, 'day').toDate() });
+        }
+        
+        if (['InTransit', 'Arrived', 'OutForDelivery', 'Delivered', 'Returned'].includes(status)) {
+          inTransitDate = faker.date.between({ from: pickupDate || bookingDate, to: moment(bookingDate).add(3, 'days').toDate() });
+        }
+        
+        if (['Arrived', 'OutForDelivery', 'Delivered', 'Returned'].includes(status)) {
+          arrivedDate = faker.date.between({ from: inTransitDate || bookingDate, to: moment(bookingDate).add(5, 'days').toDate() });
+        }
+        
+        if (['OutForDelivery', 'Delivered', 'Returned'].includes(status)) {
+          outForDeliveryDate = faker.date.between({ from: arrivedDate || inTransitDate || bookingDate, to: moment(bookingDate).add(7, 'days').toDate() });
+        }
+        
+        if (['Delivered', 'Returned'].includes(status)) {
+          deliveredDate = faker.date.between({ from: outForDeliveryDate || arrivedDate || inTransitDate || bookingDate, to: moment(bookingDate).add(10, 'days').toDate() });
+        }
+        
+        if (status === 'Cancelled') {
+          cancelledDate = faker.date.between({ from: bookingDate, to: moment(bookingDate).add(2, 'days').toDate() });
+        }
+        
+        if (status === 'Returned') {
+          returnDate = faker.date.between({ from: deliveredDate || bookingDate, to: moment(bookingDate).add(14, 'days').toDate() });
+        }
+        
+        // Select a random vehicle (if in transit or delivered)
+        let assignedVehicle = null;
+        if (['InTransit', 'Arrived', 'OutForDelivery', 'Delivered', 'Returned'].includes(status) && operatorVehicles.length > 0) {
+          assignedVehicle = faker.helpers.arrayElement(operatorVehicles)._id;
+        }
+        
+        // Create the booking object
+        // Generate booking ID with sequence
+        const bookingId = `${operator.code}-${sequence.toString().padStart(6, '0')}`;
+        
+        // Update branch LR type statistics
+        branchStats[lrType.toLowerCase()]++;
+        
+        // Create the booking object
+        const booking = {
+          bookingId: bookingId,
+          bookingNumber: trackingNumber,
+          bookingDate: bookingDate,
+          trackingNumber: trackingNumber,
+          senderName: faker.person.fullName(),
+          senderPhone: `9${faker.number.int({ min: 100000000, max: 999999999 })}`,
+          senderEmail: faker.internet.email().toLowerCase(),
+          senderAddress: `${faker.location.streetAddress()}, ${faker.location.city()}, ${faker.location.state()}, India`,
+          receiverName: faker.person.fullName(),
+          receiverPhone: `9${faker.number.int({ min: 100000000, max: 999999999 })}`,
+          receiverEmail: faker.internet.email().toLowerCase(),
+          receiverAddress: `${faker.location.streetAddress()}, ${faker.location.city()}, ${faker.location.state()}, India`,
+          fromOffice: fromBranch._id,
+          toOffice: toBranch._id,
+          packageDescription: packageType,
+          packageType: packageType,
+          weight: weight,
+          quantity: quantity,
+          valueOfGoods: valueOfGoods,
+          dimensions: dimensions,
+          status: status,
+          lrType: lrType,
+          paymentMode: paymentMode,
+          source: source,
+          bookedBy: bookedBy._id,
+          operatorId: operator._id,
+          pickupDate: pickupDate,
+          inTransitDate: inTransitDate,
+          arrivedDate: arrivedDate,
+          outForDeliveryDate: outForDeliveryDate,
+          deliveredDate: deliveredDate,
+          cancelledDate: cancelledDate,
+          returnDate: returnDate,
+          assignedVehicle: assignedVehicle,
+          deliveryCharges: faker.number.int({ min: 100, max: 5000 }),
+          taxAmount: faker.number.int({ min: 10, max: 500 }),
+          totalAmount: 0, // Will be calculated
+          advanceAmount: lrType === 'Paid' ? faker.number.int({ min: 100, max: 5000 }) : 0,
+          balanceAmount: 0, // Will be calculated
+          notes: faker.lorem.sentence(),
+          isFragile: faker.datatype.boolean(),
+          isHazardous: faker.datatype.boolean(),
+          isPerishable: faker.datatype.boolean(),
+          isReturn: faker.datatype.boolean(0.1), // 10% chance of being a return
+          createdAt: bookingDate,
+          updatedAt: new Date(),
+        };
+        
+        // Calculate amounts
+        booking.totalAmount = booking.deliveryCharges + booking.taxAmount;
+        booking.balanceAmount = booking.totalAmount - (booking.advanceAmount || 0);
+        
+        bookingBatch.push(booking);
+        bookingCount++;
+      }
       
-      const baseRate = 15; // Base rate per kg per 100km
-      const freightCharge = Math.round((booking.weight * distance * baseRate) / 100);
-      const loadingCharge = 200;
-      const unloadingCharge = 200;
-      const insuranceCharge = Math.round(booking.valueOfGoods * 0.005); // 0.5% insurance
-      const totalAmountCharge = freightCharge + loadingCharge + unloadingCharge + insuranceCharge;
-      
-      // Adjust for cancelled bookings (50% of freight charge)
-      const finalFreightCharge = booking.status === 'Cancelled' ? 
-        Math.round(freightCharge * 0.5) : freightCharge;
-      const finalTotalCharge = booking.status === 'Cancelled' ?
-        finalFreightCharge + loadingCharge + Math.round(unloadingCharge * 0.5) : totalAmountCharge;
-
-      // Generate booking ID with timestamp and index
-      const bookingDate = new Date(booking.bookingDate);
-      const bookingId = `BK${bookingDate.getFullYear().toString().slice(-2)}${(bookingDate.getMonth() + 1).toString().padStart(2, '0')}${String(index).padStart(4, '0')}`;
-
-      console.log(`Booking ID: ${bookingId}`);
-      return {
-        ...booking,
-        operatorId: operator._id,
-        bookingId,
-        freightCharge: finalFreightCharge,
-        loadingCharge: booking.status === 'Cancelled' ? loadingCharge : loadingCharge,
-        unloadingCharge: booking.status === 'Cancelled' ? Math.round(unloadingCharge * 0.5) : unloadingCharge,
-        insuranceCharge,
-        totalAmountCharge: finalTotalCharge,
-        createdAt: booking.bookingDate,
-        updatedAt: booking.deliveryDate || booking.arrivalDate || booking.bookingDate
-      };
-    });
-
-    const createdBookings = await Booking.insertMany(bookings);
-    console.log(`Created ${createdBookings.length} bookings`);
-
+      // Insert the current batch
+      if (bookingBatch.length > 0) {
+        await Booking.insertMany(bookingBatch);
+        if (bookingCount % 1000 === 0 || bookingCount === numBookings) {
+          console.log(`Created ${bookingCount} / ${numBookings} bookings (${Math.round((bookingCount / numBookings) * 100)}%)`);
+        }
+      }
+    }
     console.log('Data seeding completed successfully!');
     process.exit(0);
   } catch (error) {
