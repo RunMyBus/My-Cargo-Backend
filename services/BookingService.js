@@ -218,7 +218,7 @@ static async updateBooking(id, updateData, operatorId, currentUserId) {
       booking.unloadedBy = currentUserId;
     }
     if (newStatus === 'Delivered') {
-      booking.deliveredBy = userId;
+      booking.deliveredBy = currentUserId;
     }
     if (newStatus === 'Cancelled') {
       booking.cancelledBy = currentUserId;
