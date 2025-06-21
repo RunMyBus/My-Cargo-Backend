@@ -32,7 +32,7 @@ const MAX_BOOKINGS = 2500;
 // Database connection
 const connectDB = async () => {
   try {
-    const mongoUrl = `mongodb://${config.DB_HOST}:${config.DB_PORT}/${config.DB_NAME}`;
+    const mongoUrl = `mongodb://${config.DB_USER}:${config.DB_PASS}@${config.DB_HOST}:${config.DB_PORT}/${config.DB_NAME}`;
     await mongoose.connect(mongoUrl, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
@@ -101,7 +101,7 @@ const seedData = async () => {
     for (let i = 0; i < NUM_OPERATORS; i++) {
       const operator = await Operator.create({
         name: operatorNames[i],
-        code: operatorNames[i].split(' ').map(w => w[0]).join('').toUpperCase(),
+        code: operatorNames[i].split(' ').map(w => w[0]).join('').toUpperCase().padEnd(3, 'X'),
         address: `${faker.location.streetAddress()}, ${faker.location.city()}, ${faker.location.state()}, India`,
         phone: `+91${faker.phone.number('##########')}`,
         status: 'Active',
