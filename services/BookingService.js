@@ -283,9 +283,10 @@ static async updateBooking(id, updateData, operatorId, currentUserId) {
     }
   }
   
-  static async getUnassignedBookings(operatorId, page = 1, limit = 10, query = "") {
+  static async getUnassignedBookings(operatorId, page = 1, limit = 10, query = "", branchIds = []) {
     logger.info('Fetching unassigned bookings', { 
       operatorId, 
+      branchIds,
       page, 
       limit, 
       query: query || 'none' 
@@ -295,7 +296,10 @@ static async updateBooking(id, updateData, operatorId, currentUserId) {
       const skip = (page - 1) * limit;
       const baseFilter = {
         operatorId,
-        status: "Booked"
+        status: "Booked",
+        ...(branchIds.length > 0 && { $or: branchIds.map(branchId => ({
+          fromOffice: branchId
+        })) })
       };
 
       if (query?.trim()) {
@@ -461,9 +465,10 @@ static async updateBooking(id, updateData, operatorId, currentUserId) {
   }
 }
 
-  static async getInTransitBookings(operatorId, userId, page = 1, limit = 10, query = "") {
+  static async getInTransitBookings(operatorId, userId, page = 1, limit = 10, query = "", branchIds = []) {
     logger.info('Fetching in-transit bookings', { 
       operatorId,
+      branchIds,
       userId,
       page, 
       limit, 
@@ -474,7 +479,10 @@ static async updateBooking(id, updateData, operatorId, currentUserId) {
       const skip = (page - 1) * limit;
       const baseFilter = {
         status: { $in: ['InTransit', 'Booked'] },
-        operatorId
+        operatorId,
+        ...(branchIds.length > 0 && { $or: branchIds.map(branchId => ({
+          fromOffice: branchId
+        })) })
       };
 
       if (query?.trim()) {
@@ -555,9 +563,10 @@ static async updateBooking(id, updateData, operatorId, currentUserId) {
 }
 
 
-  static async getArrivedBookings(operatorId, userId, page = 1, limit = 10, query = "") {
+  static async getArrivedBookings(operatorId, userId, page = 1, limit = 10, query = "", branchIds = []) {
     logger.info('Fetching arrived bookings', { 
       operatorId,
+      branchIds,
       userId, 
       page, 
       limit, 
@@ -573,7 +582,10 @@ static async updateBooking(id, updateData, operatorId, currentUserId) {
 
       const baseFilter = {
         status: { $in: ['Arrived', 'Booked'] },
-        operatorId: opId
+        operatorId: opId,
+        ...(branchIds.length > 0 && { $or: branchIds.map(branchId => ({
+          fromOffice: branchId
+        })) })
       };
 
       if (query?.trim()) {

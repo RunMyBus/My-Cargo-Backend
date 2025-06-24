@@ -1,12 +1,11 @@
 // Import dependencies
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const dotenv = require('dotenv');
 const { faker } = require('@faker-js/faker/locale/en_IN');
 const moment = require('moment');
 
 // Load environment variables
-dotenv.config();
+require('dotenv').config();
 const config = process.env;
 
 // Set Faker locale for Indian names and addresses
@@ -32,7 +31,13 @@ const MAX_BOOKINGS = 2500;
 // Database connection
 const connectDB = async () => {
   try {
-    const mongoUrl = `mongodb://${config.DB_USER}:${config.DB_PASS}@${config.DB_HOST}:${config.DB_PORT}/${config.DB_NAME}`;
+    let mongoUrl = 'mongodb://' + config.DB_USER + ':' + config.DB_PASS + '@' + config.DB_HOST + '/' + config.DB_NAME;
+    if (config.DB_USER && config.DB_PASS) {
+      mongoUrl = 'mongodb://' + config.DB_USER + ':' + config.DB_PASS + '@' + config.DB_HOST + '/' + config.DB_NAME;
+    } else {
+      mongoUrl = 'mongodb://' + config.DB_HOST + ':' + config.DB_PORT + '/' + config.DB_NAME;
+    }
+    console.log('MongoDB URL:', mongoUrl);
     await mongoose.connect(mongoUrl, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
@@ -55,7 +60,12 @@ const clearData = async () => {
   console.log('Clearing existing data...');
   await Booking.deleteMany({});
   await Vehicle.deleteMany({});
-  await User.deleteMany({});
+  await User.deleteMany({
+    $or: [
+      { mobile: { $lt: "9999999990" } },
+      { mobile: { $gt: "9999999999" } }
+    ]
+  });
   await Role.deleteMany({});
   await Permission.deleteMany({});
   await Branch.deleteMany({});
@@ -67,7 +77,7 @@ const clearData = async () => {
 const seedData = async () => {
   try {
     await connectDB();
-    //await clearData();
+    await clearData();
 
     console.log('Seeding data...');
 
@@ -99,11 +109,23 @@ const seedData = async () => {
 
     const operators = [];
     for (let i = 0; i < NUM_OPERATORS; i++) {
+      // Generate valid operator code that meets requirements (3 chars, uppercase, at least one letter)
+      const nameWords = operatorNames[i].split(' ');
+      let code = '';
+      // Use first letter of each word until we get 3 chars
+      for (let j = 0; j < nameWords.length && code.length < 3; j++) {
+        code += nameWords[j][0].toUpperCase();
+      }
+      // If we don't have 3 chars, add numbers to complete it
+      while (code.length < 3) {
+        code += Math.floor(Math.random() * 10);
+      }
+      
       const operator = await Operator.create({
         name: operatorNames[i],
-        code: operatorNames[i].split(' ').map(w => w[0]).join('').toUpperCase().padEnd(3, 'X'),
+        code: code,
         address: `${faker.location.streetAddress()}, ${faker.location.city()}, ${faker.location.state()}, India`,
-        phone: `+91${faker.phone.number('##########')}`,
+        phone: `${faker.number.int({ min: 6000000000, max: 9999999999 })}`,
         status: 'Active',
         bookingSequence: 1000,
         paymentOptions: ['cash', 'UPI'],
@@ -176,7 +198,7 @@ const seedData = async () => {
         const branch = await Branch.create({
           name: `${city} ${faker.company.buzzAdjective()} Branch`,
           address: `${faker.location.streetAddress()}, ${city}, India`,
-          phone: `+91${faker.phone.number('##########')}`,
+          phone: `${faker.number.int({ min: 6000000000, max: 9999999999 })}`,
           manager: faker.person.fullName(),
           status: 'Active',
           operatorId: operator._id,
@@ -208,8 +230,8 @@ const seedData = async () => {
       
       const adminUser = await User.create({
         fullName: `${operator.name} Admin`,
-        mobile: `9${faker.phone.number('#########')}`,
-        password: await hashPassword('admin123'),
+        mobile: `${faker.number.int({ min: 6000000000, max: 9999999999 })}`,
+        password: await hashPassword('123456'),
         branchId: firstBranch._id,
         role: adminRole._id,
         status: 'Active',
@@ -231,8 +253,8 @@ const seedData = async () => {
       // Create branch manager
       const manager = await User.create({
         fullName: `Manager ${faker.person.lastName()}`,
-        mobile: `9${faker.phone.number('#########')}`,
-        password: await hashPassword('manager123'),
+        mobile: `${faker.number.int({ min: 6000000000, max: 9999999999 })}`,
+        password: await hashPassword('123456'),
         branchId: branch._id,
         role: managerRole._id,
         status: 'Active',
@@ -249,7 +271,7 @@ const seedData = async () => {
         const user = await User.create({
           fullName: faker.person.fullName(),
           mobile: `9${faker.number.int({ min: 100000000, max: 999999999 })}`,
-          password: await hashPassword('password123'),
+          password: await hashPassword('123456'),
           branchId: branch._id,
           role: role._id,
           status: 'Active',
@@ -513,11 +535,11 @@ const seedData = async () => {
           bookingDate: bookingDate,
           trackingNumber: trackingNumber,
           senderName: faker.person.fullName(),
-          senderPhone: `9${faker.number.int({ min: 100000000, max: 999999999 })}`,
+          senderPhone: `${faker.number.int({ min: 100000000, max: 999999999 })}`,
           senderEmail: faker.internet.email().toLowerCase(),
           senderAddress: `${faker.location.streetAddress()}, ${faker.location.city()}, ${faker.location.state()}, India`,
           receiverName: faker.person.fullName(),
-          receiverPhone: `9${faker.number.int({ min: 100000000, max: 999999999 })}`,
+          receiverPhone: `${faker.number.int({ min: 100000000, max: 999999999 })}`,
           receiverEmail: faker.internet.email().toLowerCase(),
           receiverAddress: `${faker.location.streetAddress()}, ${faker.location.city()}, ${faker.location.state()}, India`,
           fromOffice: fromBranch._id,
