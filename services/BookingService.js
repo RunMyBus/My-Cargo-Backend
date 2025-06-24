@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 const mongoose = require('mongoose');
 const { request } = require('express');
 const Operator = require('../models/Operator');
+const Transaction = require('../models/Transaction');
 
 class BookingService {
 static async createBooking(data, userId, operatorId) {
@@ -74,6 +75,15 @@ static async createBooking(data, userId, operatorId) {
 
       user.cargoBalance = (user.cargoBalance || 0) + booking.totalAmountCharge;
       await user.save();
+
+      await Transaction.create({
+          user: userId,
+          amount: booking.totalAmountCharge,
+          balanceAfter: user.cargoBalance,
+          type: 'Booking',
+          referenceId: booking._id,
+          description: 'Cargo balance updated from booking'
+        });
     }
 
     await booking.save();

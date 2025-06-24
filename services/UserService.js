@@ -56,89 +56,89 @@ class UserService {
    * @param {Object} userData - User data
    * @returns {Promise<Object>} Created user
    */
- static async createUser(userData, currentOperatorId, createdBy) {
-  const { mobile, password, role, branchId } = userData;
-  logger.info('Creating new user', {
-    mobile,
-    role,
-    operatorId: userData.operatorId || currentOperatorId,
-    createdBy
-  });
-
-  try {
-    // Check if mobile number exists
-    const existingUser = await User.findOne({ mobile });
-    if (existingUser) {
-      logger.warn('Mobile number already exists', { mobile });
-      throw new Error('Mobile number already exists');
-    }
-
-    // Validate role
-    const roleExists = await Role.findById(role);
-    if (!roleExists) {
-      logger.warn('Invalid role ID provided', { role });
-      throw new Error('Invalid role ID');
-    }
-
-    // Validate branch if provided
-    if (branchId) {
-      const branchExists = await Branch.findById(branchId);
-      if (!branchExists) {
-        logger.warn('Invalid branch ID provided', { branchId });
-        throw new Error('Invalid branch ID');
-      }
-    }
-
-    // Determine operatorId
-    const operatorIdToUse = userData.operatorId || currentOperatorId;
-    if (!operatorIdToUse) {
-      throw new Error('Operator ID is required');
-    }
-
-    // Format status
-    const status = userData.status?.charAt(0).toUpperCase() +
-                   (userData.status?.slice(1).toLowerCase() || '');
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user
-    const newUser = new User({
-      ...userData,
-      password: hashedPassword,
-      status: status || 'Active',
-      operatorId: operatorIdToUse,
-      createdBy: createdBy || null,
-      cargoBalance: 0,
-    });
-
-    const savedUser = await newUser.save();
-
-    logger.info('User created successfully', {
-      userId: savedUser._id,
+  static async createUser(userData, currentOperatorId, createdBy) {
+    const { mobile, password, role, branchId } = userData;
+    logger.info('Creating new user', {
       mobile,
+      role,
+      operatorId: userData.operatorId || currentOperatorId,
       createdBy
     });
 
-    return savedUser; // Return full document with password and timestamps
-  } catch (error) {
-    logger.error('Error creating user', {
-      error: error.message,
-      mobile,
-      operatorId: userData.operatorId || currentOperatorId,
-      createdBy,
-      stack: error.stack
-    });
-    throw error;
-  }
-}
+    try {
+      // Check if mobile number exists
+      const existingUser = await User.findOne({ mobile });
+      if (existingUser) {
+        logger.warn('Mobile number already exists', { mobile });
+        throw new Error('Mobile number already exists');
+      }
 
-  /**
-   * Update user
-   * @param {string} id - User ID
-   * @param {Object} updateData - Data to update
-   * @returns {Promise<Object>} Updated user
-   */
+      // Validate role
+      const roleExists = await Role.findById(role);
+      if (!roleExists) {
+        logger.warn('Invalid role ID provided', { role });
+        throw new Error('Invalid role ID');
+      }
+
+      // Validate branch if provided
+      if (branchId) {
+        const branchExists = await Branch.findById(branchId);
+        if (!branchExists) {
+          logger.warn('Invalid branch ID provided', { branchId });
+          throw new Error('Invalid branch ID');
+        }
+      }
+
+      // Determine operatorId
+      const operatorIdToUse = userData.operatorId || currentOperatorId;
+      if (!operatorIdToUse) {
+        throw new Error('Operator ID is required');
+      }
+
+      // Format status
+      const status = userData.status?.charAt(0).toUpperCase() +
+                    (userData.status?.slice(1).toLowerCase() || '');
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Create user
+      const newUser = new User({
+        ...userData,
+        password: hashedPassword,
+        status: status || 'Active',
+        operatorId: operatorIdToUse,
+        createdBy: createdBy || null,
+        cargoBalance: 0,
+      });
+
+      const savedUser = await newUser.save();
+
+      logger.info('User created successfully', {
+        userId: savedUser._id,
+        mobile,
+        createdBy
+      });
+
+      return savedUser; // Return full document with password and timestamps
+    } catch (error) {
+      logger.error('Error creating user', {
+        error: error.message,
+        mobile,
+        operatorId: userData.operatorId || currentOperatorId,
+        createdBy,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+    /**
+     * Update user
+     * @param {string} id - User ID
+     * @param {Object} updateData - Data to update
+     * @returns {Promise<Object>} Updated user
+     */
   static async updateUser(id, updateData) {
     logger.info('Updating user', { userId: id, updateFields: Object.keys(updateData) });
     
@@ -182,11 +182,11 @@ class UserService {
     }
   }
 
-  /**
-   * Delete user
-   * @param {string} id - User ID
-   * @returns {Promise<Object>} Deletion result
-   */
+    /**
+     * Delete user
+     * @param {string} id - User ID
+     * @returns {Promise<Object>} Deletion result
+     */
   static async deleteUser(id) {
     logger.info('Deleting user', { userId: id });
     

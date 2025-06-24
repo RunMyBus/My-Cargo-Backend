@@ -37,6 +37,16 @@ const operatorSchema = new mongoose.Schema({
       message: 'Payment options must include at least one valid option: cash or UPI'
     }
   },
+  gstNumber: {
+    type: String,
+    match: [/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/, 'Invalid GST number format'],
+    required: false
+  },
+  panNumber: {
+    type: String,
+    match: [/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN number format'],
+    required: false
+  },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   createdAt: { type: Date, default: Date.now },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
