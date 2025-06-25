@@ -84,6 +84,7 @@ exports.login = async (req, res) => {
       token: token,
       role: user.role?.rolename  || null,
       operatorId: user.operatorId,
+      branchId: user.branchId,
       paymentOptions,
       message: 'LOGGED_IN_SUCCESSFULLY'
     });
