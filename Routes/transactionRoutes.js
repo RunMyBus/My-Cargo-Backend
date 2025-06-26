@@ -6,6 +6,6 @@ const passport = require('passport');
 
 router.use(passport.authenticate('jwt', { session: false }));
 
-router.get('/', transactionController.getUserTransactions);
+router.post('/', transactionController.getUserTransactions);
 
 module.exports = router;

@@ -18,10 +18,6 @@ router.get('/:id', cashTransferController.getCashTransferById);
 // Create a new cash transfer request
 router.post('/', cashTransferController.createCashTransfer);
 
-
-// Update cash transfer status (approve/reject)
-router.put('/status/:id', cashTransferController.updateCashTransferStatus);
-
 // Update pending cash transfer (amount/description)
 router.put('/:id', cashTransferController.updateCashTransfer);
 

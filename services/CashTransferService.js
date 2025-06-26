@@ -2,6 +2,7 @@
 const CashTransfer = require('../models/CashTransfer');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const Transaction = require('../models/Transaction');
 const { Parser } = require('json2csv');
 
 class CashTransferService {
@@ -24,42 +25,51 @@ class CashTransferService {
         return await newTransfer.save();
     }
 
-    static async getCashTransfers(operatorId, status, { page, limit }) {
-        const query = { operatorId };
-        if (status) query.status = status;
+static async getCashTransfers(operatorId, status, { page, limit }) {
+    const query = { operatorId };
 
-        const skip = (page - 1) * limit;
+    // Handle custom status filtering
+    if (status) {
+        if (status === 'NonPending') {
+            query.status = { $in: ['Approved', 'Rejected'] }; // Modify this list as per your app logic
+        } else {
+            query.status = status;
+        }
+    }
 
-        const [transfers, totalRecords] = await Promise.all([
-            CashTransfer.find(query)
+    const skip = (page - 1) * limit;
+
+    const [transfers, totalRecords] = await Promise.all([
+        CashTransfer.find(query)
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
             .populate('fromUser', 'fullName')
             .populate('toUser', 'fullName'),
-            CashTransfer.countDocuments(query)
-        ]);
+        CashTransfer.countDocuments(query)
+    ]);
 
-        const formattedTransfers = transfers.map((t, index) => ({
-            sNo: skip + index + 1,
-            _id: t._id,
-            amount: t.amount,
-            description: t.description,
-            status: t.status,
-            date: t.createdAt.toISOString().split('T')[0],
-            fromUser: t.fromUser ? { _id: t.fromUser._id, fullName: t.fromUser.fullName } : null,
-            toUser: t.toUser ? { _id: t.toUser._id, fullName: t.toUser.fullName } : null,
-            createdBy: t.fromUser ? { _id: t.fromUser._id, fullName: t.fromUser.fullName } : null
-        }));
+    const formattedTransfers = transfers.map((t, index) => ({
+        sNo: skip + index + 1,
+        _id: t._id,
+        amount: t.amount,
+        description: t.description,
+        status: t.status,
+        date: t.createdAt.toISOString().split('T')[0],
+        fromUser: t.fromUser ? { _id: t.fromUser._id, fullName: t.fromUser.fullName } : null,
+        toUser: t.toUser ? { _id: t.toUser._id, fullName: t.toUser.fullName } : null,
+        createdBy: t.fromUser ? { _id: t.fromUser._id, fullName: t.fromUser.fullName } : null
+    }));
 
-        return {
-            page,
-            limit,
-            totalPages: Math.ceil(totalRecords / limit),
-            totalRecords,
-            data: formattedTransfers
-        };
-    }
+    return {
+        page,
+        limit,
+        totalPages: Math.ceil(totalRecords / limit),
+        totalRecords,
+        data: formattedTransfers
+    };
+}
+
 
     static async getCashTransfersByStatus(operatorId, status, { page, limit }) {
         const query = { operatorId };
@@ -136,7 +146,6 @@ class CashTransferService {
     const allowedFields = ['amount', 'description', 'fromUser', 'toUser', 'status'];
     const updatePayload = {};
 
-    // Validate status if present
     const allowedStatuses = ['Pending', 'Approved', 'Rejected'];
     if (updateData.status !== undefined) {
         if (!allowedStatuses.includes(updateData.status)) {
@@ -149,7 +158,6 @@ class CashTransferService {
         throw new Error('Cash transfer not found');
     }
 
-    // Prevent status update if already processed
     if (
         updateData.status !== undefined &&
         transfer.status !== 'Pending'
@@ -157,7 +165,6 @@ class CashTransferService {
         throw new Error('Cash transfer already processed');
     }
 
-    // If approving, process cargo balances
     if (updateData.status === 'Approved') {
         const [fromUser, toUser] = await Promise.all([
             User.findById(transfer.fromUser),
@@ -172,13 +179,26 @@ class CashTransferService {
             throw new Error('Insufficient cargo balance for transfer');
         }
 
+        // Update balances
         fromUser.cargoBalance -= transfer.amount;
         toUser.cargoBalance = (toUser.cargoBalance || 0) + transfer.amount;
 
         await Promise.all([fromUser.save(), toUser.save()]);
+
+        //  Create a Transaction document
+        await Transaction.create({
+            user: toUser._id, 
+            fromUser: fromUser._id,
+            toUser: toUser._id,
+            amount: transfer.amount,
+            balanceAfter: toUser.cargoBalance,
+            type: 'Transfer',
+            description: `Cash Transfer of ₹${transfer.amount} from ${fromUser.fullName} to ${toUser.fullName}`,
+            referenceId: null,
+            cashTransferId: transfer._id, 
+        });
     }
 
-    // Build update payload (excluding status if not provided)
     for (const field of allowedFields) {
         if (updateData[field] !== undefined) {
             updatePayload[field] = updateData[field];

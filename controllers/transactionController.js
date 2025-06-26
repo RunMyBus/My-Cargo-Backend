@@ -1,11 +1,24 @@
 // controllers/transactionController.js
-const Transaction = require('../models/Transaction');
+const transactionService = require('../services/transactionService');
 
 exports.getUserTransactions = async (req, res) => {
   try {
-    const transactions = await Transaction.find({ user: req.user._id }).sort({ createdAt: -1 });
-    res.json(transactions);
+    const { page = 1, limit = 10 } = req.body;
+
+    const { transactions, totalCount } = await transactionService.getTransactionsByOperator(
+      req.user.operatorId, 
+      parseInt(page),
+      parseInt(limit)
+    );
+
+    res.json({
+      data: transactions,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalCount
+    });
   } catch (err) {
+    console.error('Failed to fetch transactions:', err);
     res.status(500).json({ error: 'Failed to fetch transactions' });
   }
 };
