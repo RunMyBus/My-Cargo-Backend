@@ -69,10 +69,15 @@ const bookingSchema = new mongoose.Schema({
   },
 
   paymentType: {
-  type: String,
-  enum: ['', 'cash', 'UPI'],
-  default: ''
-}
+    type: String,
+    enum: ['', 'cash', 'UPI'],
+    default: ''
+  },
+
+  isCargoBalanceCredited: {
+    type: Boolean,
+    default: false
+  }
 
 }, { timestamps: true });
 

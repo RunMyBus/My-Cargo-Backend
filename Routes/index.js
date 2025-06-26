@@ -10,6 +10,7 @@ const operatorRoutes = require('./operatorRoutes');
 const chartRoutes = require('./chartRoutes');
 const cashTransferRoutes = require('./cashTransferRoutes');
 const transactionRoutes = require('./transactionRoutes');
+const trackShipmentRoutes = require('./trackShipmentRoutes');
 
 router.use('/auth', authRoutes);
 router.use('/roles', roleRoutes);
@@ -21,5 +22,6 @@ router.use('/operators', operatorRoutes);
 router.use('/charts', chartRoutes);
 router.use('/cashtransfers', cashTransferRoutes);
 router.use('/transactions', transactionRoutes);
+router.use('/trackShipment', trackShipmentRoutes);
 
 module.exports = router;
