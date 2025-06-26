@@ -59,20 +59,7 @@ exports.getCashTransferById = async (req, res) => {
   }
 };
 
-// Update the status of a cash transfer (approve or reject)
-exports.updateCashTransferStatus = async (req, res) => {
-  try {
-    const { status } = req.body;
-    const result = await CashTransferService.updateCashTransferStatus(req.params.id, status);
-    if (!result) {
-      return res.status(404).json({ message: 'Transfer not found or update failed' });
-    }
-    res.status(200).json({ message: 'Transfer status updated', data: result });
-  } catch (err) {
-    logger.error('Error updating cash transfer status:', err.message);
-    res.status(400).json({ message: err.message || 'Invalid status update' });
-  }
-};
+
 
 // Update a pending cash transfer
 exports.updateCashTransfer = async (req, res) => {
