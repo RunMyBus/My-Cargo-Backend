@@ -7,19 +7,49 @@ const ExportService = require('../services/ExportService');
 
 
 // Create booking
-exports.createBooking = async (req, res) => {
+exports.intiateBooking = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId();
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
-    const booking = await BookingService.createBooking(req.body, req.user._id, operatorId);
+    const booking = await BookingService.intiateBooking(req.body, req.user._id, operatorId);
     res.status(201).json(booking);
   } catch (error) {
     logger.error('Error creating booking in controller', { error: error.message });
     res.status(400).json({ error: error.message });
   }
 };
+
+
+exports.collectPayment = async (req, res) => {
+  try {
+    const operatorId = requestContext.getOperatorId();
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+
+    const bookingId = req.params.bookingId;
+    if (!bookingId) {
+      return res.status(400).json({ error: 'Booking ID is required' });
+    }
+
+    //  Get Mongoose document
+    const booking = await BookingService.getBookingById(bookingId, operatorId, true);
+
+    //  Apply update from frontend
+    await BookingService.collectPayment(booking, req.user._id, req.body);
+
+    res.status(200).json({ message: 'Payment collected successfully' });
+  } catch (error) {
+    logger.error('Error in bookingController.collectPayment', { error: error.message });
+    res.status(500).json({ error: 'Failed to collect payment' });
+  }
+};
+
+
+
+
 
 /**
  * Get all bookings
@@ -315,5 +345,30 @@ exports.exportInTransitBookings = async (req, res) => {
     });
 
     res.status(500).json({ error: 'Failed to export in transit bookings' });
+  }
+};
+
+exports.markAsDelivered = async (req, res) => {
+  try {
+    const operatorId = requestContext.getOperatorId();
+    const userId = req.user._id;
+    const bookingId = req.params.bookingId;
+
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+
+    if (!bookingId) {
+      return res.status(400).json({ error: 'Booking ID is required' });
+    }
+
+    const booking = await BookingService.getBookingById(bookingId, operatorId, true);
+
+    await BookingService.markAsDelivered(booking, userId, req.body);
+
+    res.status(200).json({ message: 'Booking marked as delivered successfully' });
+  } catch (error) {
+    logger.error('Error in markAsDelivered controller', { error: error.message });
+    res.status(500).json({ error: error.message || 'Failed to mark as delivered' });
   }
 };

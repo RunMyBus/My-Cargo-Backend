@@ -8,7 +8,7 @@ const transactionSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   balanceAfter: { type: Number, required: true },
   oldBalance: { type: Number },
-  type: { type: String, enum: ['Booking', 'Transfer'], required: true },
+  type: { type: String, enum: ['Booking', 'Transfer', 'Delivered'], required: true },
  referenceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' },
  cashTransferId: { type: mongoose.Schema.Types.ObjectId, ref: 'CashTransfer' },
   description: { type: String },

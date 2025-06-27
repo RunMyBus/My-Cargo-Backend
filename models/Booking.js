@@ -1,5 +1,12 @@
 const mongoose = require('mongoose');
 
+const assignedVehicleHistorySchema = new mongoose.Schema({
+  vehicle: { type: mongoose.Schema.Types.ObjectId, ref: 'Vehicle', required: true },
+  assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  assignedAt: { type: Date, default: Date.now }
+}, { _id: false });
+
+
 const bookingSchema = new mongoose.Schema({
   bookingId: { type: String },
   bookingDate: { type: String, index: true },
@@ -31,6 +38,7 @@ const bookingSchema = new mongoose.Schema({
   // Dates
   dispatchDate: String,
   arrivalDate: String,
+  wayBillNo: { type: String },
 
   // Package info
   packageDescription: String,
@@ -46,11 +54,14 @@ const bookingSchema = new mongoose.Schema({
     default: null
   },
 
+    assignedVehicleHistory: [assignedVehicleHistorySchema],
+
+
   // Status
   status: {
     type: String,
-    enum: ['Booked', 'InTransit', 'Cancelled', 'Arrived', 'Delivered'],
-    default: 'Booked',
+    enum: ['Pending','Booked', 'InTransit', 'Cancelled', 'Arrived', 'Delivered'],
+    default: 'Pending',
   },
 
   // Charges
@@ -60,12 +71,12 @@ const bookingSchema = new mongoose.Schema({
   otherCharge: { type: Number, default: 0 },
   totalAmountCharge: { type: Number, default: 0 },
 
+
+
   // LR Type
   lrType: {
     type: String,
     enum: ['Paid', 'ToPay'],
-    default: 'Paid',
-    required: true
   },
 
   paymentType: {
