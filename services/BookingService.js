@@ -145,9 +145,9 @@ static async intiateBooking(data, userId, operatorId) {
     }
   }
 
-  static async getBookingById(id, operatorId) {
+ static async getBookingById(id, operatorId, returnRaw = false) {
     logger.info('Fetching booking by ID', { bookingId: id, operatorId });
-    
+
     try {
       const booking = await Booking.findOne({ _id: id, operatorId })
         .populate('fromOffice', '_id name')
@@ -163,26 +163,24 @@ static async intiateBooking(data, userId, operatorId) {
         throw new Error('Booking not found');
       }
 
-      logger.debug('Successfully fetched booking', { 
-        bookingId: id,
-        status: booking.status,
-        operatorId 
-      });
+      if (returnRaw) {
+        return booking;
+      }
 
-      return {
-        ...booking.toObject(),
-        senderName: booking.assignedVehicle?.vehicleNumber || "Assign vehicleNumber"
-      };
+      const result = booking.toObject();
+      result.senderName = booking.assignedVehicle?.vehicleNumber || "Assign vehicleNumber";
+      return result;
     } catch (error) {
-      logger.error('Error getting booking by ID', { 
-        error: error.message, 
-        bookingId: id, 
+      logger.error('Error getting booking by ID', {
+        error: error.message,
+        bookingId: id,
         operatorId,
-        stack: error.stack 
+        stack: error.stack
       });
       throw error;
     }
   }
+
 
   /**
    * Confirm a booking by updating cargo balance and creating a transaction
@@ -190,95 +188,144 @@ static async intiateBooking(data, userId, operatorId) {
    * @param {string} userId - ID of the user confirming the booking
    * @returns {Promise<void>}
    */
-  static async collectPayment(booking, userId) {
-    try {
-      const user = await User.findById(userId);
-      if (!user) throw new Error('User not found');
+ 
+static async collectPayment(booking, userId, updateData = {}) {
+  try {
+    const user = await User.findById(userId);
+    if (!user) throw new Error('User not found');
 
-      user.cargoBalance = (user.cargoBalance || 0) + booking.totalAmountCharge;
+    // Update booking fields
+    if (updateData.lrType) booking.lrType = updateData.lrType;
+    if (Array.isArray(updateData.paymentTypes)) booking.paymentTypes = updateData.paymentTypes;
+    if (updateData.status) booking.status = updateData.status;
+
+    await booking.save(); // Persist updated booking
+
+    // Only update cargo balance for 'Paid' bookings
+    if (booking.lrType === 'Paid') {
+      const amount = booking.totalAmountCharge || 0;
+      user.cargoBalance = (user.cargoBalance || 0) + amount;
       await user.save();
 
+      // Create a transaction record
       await Transaction.create({
         user: userId,
-        amount: booking.totalAmountCharge,
+        amount,
         balanceAfter: user.cargoBalance,
         type: 'Booking',
         referenceId: booking._id,
-        description: 'Cargo balance updated from booking'
+        description: 'Cargo balance updated from Paid booking'
       });
 
-      logger.info('Booking confirmed and cargo balance updated', {
+      logger.info('Cargo balance updated for Paid booking', {
         bookingId: booking._id,
         userId,
-        amount: booking.totalAmountCharge,
+        amount,
         newBalance: user.cargoBalance
       });
-    } catch (error) {
-      logger.error('Error confirming booking', {
-        error: error.message,
+    } else {
+      logger.info('ToPay booking — cargo balance not updated', {
         bookingId: booking._id,
         userId,
-        stack: error.stack
+        lrType: booking.lrType
       });
-      throw error;
     }
-  }
 
-  static async updateBooking(id, updateData, operatorId, currentUserId) {
-    logger.info('Updating booking', { 
-      bookingId: id, 
-      operatorId,
-      updateFields: Object.keys(updateData)
+    logger.info('Booking confirmed and updated successfully', {
+      bookingId: booking._id,
+      userId,
+      lrType: booking.lrType,
+      status: booking.status
     });
 
-    try {
-      const booking = await Booking.findOne({ _id: id, operatorId });
-
-      if (!booking) {
-        logger.warn('Booking not found for update', { bookingId: id, operatorId });
-        throw new Error('Booking not found');
-      }
-
-      const newStatus = updateData.status;
-
-      // Track who performed the action
-      if (newStatus === 'Loaded') booking.loadedBy = currentUserId;
-      if (newStatus === 'Unloaded') booking.unloadedBy = currentUserId;
-      if (newStatus === 'Delivered') booking.deliveredBy = currentUserId;
-      if (newStatus === 'Cancelled') booking.cancelledBy = currentUserId;
-
-      // Merge update data into booking (including paymentType if present)
-      Object.assign(booking, updateData);
-      booking.updatedAt = new Date();
-
-      // Handle delivery confirmation
-      if (newStatus === 'Delivered' && booking.lrType === 'ToPay' && !booking.isCargoBalanceCredited) {
-        await this.collectPayment(booking, currentUserId);
-        booking.isCargoBalanceCredited = true;
-      }
-
-      await booking.save();
-
-      logger.info('Successfully updated booking', { 
-        bookingId: booking._id,
-        status: booking.status,
-        operatorId,
-        assignedVehicle: booking.assignedVehicle,
-        loadedBy: booking.loadedBy,
-        cancelledBy: booking.cancelledBy
-      });
-
-      return booking;
-    } catch (error) {
-      logger.error('Error updating booking', { 
-        error: error.message, 
-        bookingId: id, 
-        operatorId,
-        stack: error.stack 
-      });
-      throw error;
-    }
+  } catch (error) {
+    logger.error('Error confirming booking', {
+      error: error.message,
+      bookingId: booking._id,
+      userId,
+      stack: error.stack
+    });
+    throw error;
   }
+}
+
+
+
+static async updateBooking(id, updateData, operatorId, currentUserId) {
+  logger.info('Updating booking', { 
+    bookingId: id, 
+    operatorId,
+    updateFields: Object.keys(updateData)
+  });
+
+  try {
+    const booking = await Booking.findOne({ _id: id, operatorId });
+
+    if (!booking) {
+      logger.warn('Booking not found for update', { bookingId: id, operatorId });
+      throw new Error('Booking not found');
+    }
+
+    const newStatus = updateData.status;
+
+    // Handle status-specific user tracking
+    if (newStatus === 'Loaded') {
+      booking.loadedBy = currentUserId;
+    }
+    if (newStatus === 'Unloaded') {
+      booking.unloadedBy = currentUserId;
+    }
+    if (newStatus === 'Delivered') {
+      booking.deliveredBy = currentUserId;
+    }
+    if (newStatus === 'Cancelled') {
+      booking.cancelledBy = currentUserId;
+    }
+
+    // If assigning vehicle for the first time or changing vehicle
+    if (
+      updateData.assignedVehicle &&
+      (!booking.assignedVehicle || booking.assignedVehicle.toString() !== updateData.assignedVehicle)
+    ) {
+      booking.assignedVehicle = updateData.assignedVehicle;
+
+      // Add to assignedVehicleHistory
+      booking.assignedVehicleHistory.push({
+        vehicle: updateData.assignedVehicle,
+        assignedBy: currentUserId,
+        assignedAt: new Date()
+      });
+
+      booking.loadedBy = currentUserId; 
+    }
+
+    // Apply remaining fields from updateData
+    Object.assign(booking, updateData);
+    booking.updatedAt = new Date();
+
+    await booking.save();
+
+    logger.info('Successfully updated booking', {
+      bookingId: id,
+      status: booking.status,
+      operatorId,
+      assignedVehicle: booking.assignedVehicle,
+      loadedBy: booking.loadedBy,
+      cancelledBy: booking.cancelledBy
+    });
+
+    return booking;
+  } catch (error) {
+    logger.error('Error updating booking', {
+      error: error.message,
+      bookingId: id,
+      operatorId,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
 
   static async deleteBooking(id, operatorId) {
     logger.info('Deleting booking', { bookingId: id, operatorId });
@@ -316,7 +363,7 @@ static async intiateBooking(data, userId, operatorId) {
       const skip = (page - 1) * limit;
       const baseFilter = {
         operatorId,
-        status: "Booked",
+        status: { $in: ["Booked", "InTransit"] },
         ...(branchIds.length > 0 && { $or: branchIds.map(branchId => ({
           fromOffice: branchId
         })) })
@@ -498,7 +545,7 @@ static async intiateBooking(data, userId, operatorId) {
     try {
       const skip = (page - 1) * limit;
       const baseFilter = {
-        status: { $in: ['InTransit', 'Booked'] },
+        status: { $in: ['InTransit', 'Booked','Arrived'] },
         operatorId,
         ...(branchIds.length > 0 && { $or: branchIds.map(branchId => ({
           fromOffice: branchId
@@ -767,7 +814,60 @@ static async intiateBooking(data, userId, operatorId) {
       throw error;
     }
   }
+
+  static async markAsDelivered(booking, userId, updateData = {}) {
+  try {
+    const user = await User.findById(userId);
+    if (!user) throw new Error('User not found');
+
+    // Apply updates
+    if (updateData.status) booking.status = updateData.status;
+    if (updateData.paymentType) booking.paymentType = updateData.paymentType;
+    booking.deliveredBy = userId;
+
+    // If paymentType is 'cash', update cargo balance
+    if (updateData.paymentType?.toLowerCase() === 'cash') {
+      const amount = booking.totalAmountCharge || 0;
+      user.cargoBalance = (user.cargoBalance || 0) + amount;
+
+      await Transaction.create({
+        user: userId,
+        amount: amount,
+        balanceAfter: user.cargoBalance,
+        type: 'Delivered',
+        referenceId: booking._id,
+        description: 'Cargo balance updated from delivery (cash payment)'
+      });
+
+      await user.save();
+    }
+
+    await booking.save();
+
+    logger.info('Booking marked as delivered', {
+      bookingId: booking._id,
+      userId,
+      paymentType: updateData.paymentType,
+      status: updateData.status,
+      amount: booking.totalAmountCharge,
+      updatedBalance: user.cargoBalance
+    });
+
+  } catch (error) {
+    logger.error('Error marking booking as delivered', {
+      error: error.message,
+      bookingId: booking._id,
+      userId,
+      stack: error.stack
+    });
+    throw error;
+  }
 }
+
+}
+
+
+
 
 module.exports = BookingService;
 

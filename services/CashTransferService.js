@@ -25,13 +25,19 @@ class CashTransferService {
         return await newTransfer.save();
     }
 
-static async getCashTransfers(operatorId, status, { page, limit }) {
-    const query = { operatorId };
+static async getCashTransfers(operatorId, status, { page, limit }, user) {
+    const query = {
+        operatorId,
+        $or: [
+            { fromUser: user._id },
+            { toUser: user._id }
+        ]
+    };
 
     // Handle custom status filtering
     if (status) {
         if (status === 'NonPending') {
-            query.status = { $in: ['Approved', 'Rejected'] }; // Modify this list as per your app logic
+            query.status = { $in: ['Approved', 'Rejected'] };
         } else {
             query.status = status;
         }
@@ -69,6 +75,7 @@ static async getCashTransfers(operatorId, status, { page, limit }) {
         data: formattedTransfers
     };
 }
+
 
 
     static async getCashTransfersByStatus(operatorId, status, { page, limit }) {
