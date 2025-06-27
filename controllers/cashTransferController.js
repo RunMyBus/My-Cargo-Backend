@@ -20,6 +20,7 @@ exports.createCashTransfer = async (req, res) => {
 exports.getCashTransfers = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId();
+    const currentUser = req.user;
 
     const {
       status,
@@ -35,7 +36,8 @@ exports.getCashTransfers = async (req, res) => {
     const result = await CashTransferService.getCashTransfers(
       operatorId,
       status,
-      paginationOptions
+      paginationOptions,
+      currentUser 
     );
 
     res.status(200).json(result);
@@ -44,6 +46,7 @@ exports.getCashTransfers = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
 
 // Get a specific cash transfer by ID
 exports.getCashTransferById = async (req, res) => {

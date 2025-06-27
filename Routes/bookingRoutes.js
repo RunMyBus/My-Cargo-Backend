@@ -9,7 +9,6 @@ router.use(passport.authenticate('jwt', { session: false }));
 router.post('/arrived', bookingController.getArrivedBookings);
 
 router.post('/intiateBooking', bookingController.intiateBooking);
-router.post('/confimBooking', bookingController.confimBooking);
 router.post('/unassigned', bookingController.getUnassignedBookings);
 router.post('/assigned', bookingController.getAssignedBookings);
 router.post('/in-transit', bookingController.getInTransitBookings);
@@ -23,7 +22,10 @@ router.get('/all', bookingController.getAllBookings);
 
 // Dynamic routes with :id last
 router.get('/:id', bookingController.getBookingById);
+router.put('/confirmBooking/:bookingId', bookingController.collectPayment);
 router.put('/:id', bookingController.updateBooking);
+router.put('/deliver/:bookingId', bookingController.markAsDelivered);
 router.delete('/:id', bookingController.deleteBooking);
+
 
 module.exports = router;

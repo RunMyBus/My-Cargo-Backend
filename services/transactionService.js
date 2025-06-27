@@ -1,4 +1,3 @@
-// services/transactionService.js
 const Transaction = require('../models/Transaction');
 const mongoose = require('mongoose');
 
@@ -8,11 +7,11 @@ exports.getTransactionsByOperator = async (operatorId, page, limit) => {
   const aggregationPipeline = [
     {
       $match: {
-        type: { $in: ['Booking', 'Transfer'] }
+        type: { $in: ['Booking', 'Transfer', 'Delivered'] } // ✅ include Delivered
       }
     },
 
-    // Lookup booking if it's a Booking type
+    // Lookup booking if it's a Booking or Delivered type
     {
       $lookup: {
         from: 'bookings',
@@ -34,12 +33,12 @@ exports.getTransactionsByOperator = async (operatorId, page, limit) => {
     },
     { $unwind: { path: '$cashTransfer', preserveNullAndEmptyArrays: true } },
 
-    // Filter: Booking must match operator, Transfer must be Approved
+    // Filter based on operator or approval status
     {
       $match: {
         $or: [
           {
-            type: 'Booking',
+            type: { $in: ['Booking', 'Delivered'] },
             'booking.operatorId': new mongoose.Types.ObjectId(operatorId)
           },
           {
@@ -102,19 +101,34 @@ exports.getTransactionsByOperator = async (operatorId, page, limit) => {
         fromUserName: '$fromUserObj.fullName',
         toUserName: '$toUserObj.fullName',
         description: {
-          $cond: {
-            if: { $eq: ['$type', 'Booking'] },
-            then: {
-              $concat: [
-                'Cargo Booking : ',
-                { $toString: '$booking.bookingId' },
-                ' by ',
-                { $ifNull: ['$bookedUser.fullName', 'Unknown'] },
-                ' has been posted for amount of ₹',
-                { $toString: '$amount' }
-              ]
-            },
-            else: {
+          $switch: {
+            branches: [
+              {
+                case: { $eq: ['$type', 'Booking'] },
+                then: {
+                  $concat: [
+                    'Cargo Booking : ',
+                    { $toString: '$booking.bookingId' },
+                    ' by ',
+                    { $ifNull: ['$bookedUser.fullName', 'Unknown'] },
+                    ' has been posted for amount of ₹',
+                    { $toString: '$amount' }
+                  ]
+                }
+              },
+              {
+                case: { $eq: ['$type', 'Delivered'] },
+                then: {
+                  $concat: [
+                    'Delivery : Booking ',
+                    { $toString: '$booking.bookingId' },
+                    ' marked delivered and paid ₹',
+                    { $toString: '$amount' }
+                  ]
+                }
+              }
+            ],
+            default: {
               $concat: [
                 'Cash Transfer of ₹',
                 { $toString: '$amount' },
@@ -134,14 +148,13 @@ exports.getTransactionsByOperator = async (operatorId, page, limit) => {
     { $limit: limit }
   ];
 
-  // Run pipeline
   const results = await Transaction.aggregate(aggregationPipeline);
 
-  // Count pipeline
+  // Count aggregation (also includes Delivered now)
   const countAggregation = await Transaction.aggregate([
     {
       $match: {
-        type: { $in: ['Booking', 'Transfer'] }
+        type: { $in: ['Booking', 'Transfer', 'Delivered'] }
       }
     },
     {
@@ -166,7 +179,7 @@ exports.getTransactionsByOperator = async (operatorId, page, limit) => {
       $match: {
         $or: [
           {
-            type: 'Booking',
+            type: { $in: ['Booking', 'Delivered'] },
             'booking.operatorId': new mongoose.Types.ObjectId(operatorId)
           },
           {
