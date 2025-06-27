@@ -8,7 +8,7 @@ const Operator = require('../models/Operator');
 const Transaction = require('../models/Transaction');
 
 class BookingService {
-static async createBooking(data, userId, operatorId) {
+static async intiateBooking(data, userId, operatorId) {
   try {
     logger.info('Booking creation request received', {
       userId,
@@ -67,25 +67,6 @@ static async createBooking(data, userId, operatorId) {
     const datePart = `${dd}${mm}${yy}`;
     const operatorCode = operator.code;
     booking.bookingId = `${typeCode}-${operatorCode}${datePart}-${sequenceStr}`;
-
-    // Update user cargo balance if needed
-    if (booking.lrType === 'Paid') {
-      const user = await User.findById(userId);
-      if (!user) throw new Error('User not found');
-
-      user.cargoBalance = (user.cargoBalance || 0) + booking.totalAmountCharge;
-      await user.save();
-
-      await Transaction.create({
-          user: userId,
-          amount: booking.totalAmountCharge,
-          balanceAfter: user.cargoBalance,
-          type: 'Booking',
-          referenceId: booking._id,
-          description: 'Cargo balance updated from booking'
-        });
-    }
-
     await booking.save();
 
     // Populate before returning
@@ -203,94 +184,101 @@ static async createBooking(data, userId, operatorId) {
     }
   }
 
-static async updateBooking(id, updateData, operatorId, currentUserId) {
-  logger.info('Updating booking', { 
-    bookingId: id, 
-    operatorId,
-    updateFields: Object.keys(updateData)
-  });
+  /**
+   * Confirm a booking by updating cargo balance and creating a transaction
+   * @param {Object} booking - The booking document
+   * @param {string} userId - ID of the user confirming the booking
+   * @returns {Promise<void>}
+   */
+  static async collectPayment(booking, userId) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) throw new Error('User not found');
 
-  try {
-    const booking = await Booking.findOne({ _id: id, operatorId });
+      user.cargoBalance = (user.cargoBalance || 0) + booking.totalAmountCharge;
+      await user.save();
 
-    if (!booking) {
-      logger.warn('Booking not found for update', { bookingId: id, operatorId });
-      throw new Error('Booking not found');
+      await Transaction.create({
+        user: userId,
+        amount: booking.totalAmountCharge,
+        balanceAfter: user.cargoBalance,
+        type: 'Booking',
+        referenceId: booking._id,
+        description: 'Cargo balance updated from booking'
+      });
+
+      logger.info('Booking confirmed and cargo balance updated', {
+        bookingId: booking._id,
+        userId,
+        amount: booking.totalAmountCharge,
+        newBalance: user.cargoBalance
+      });
+    } catch (error) {
+      logger.error('Error confirming booking', {
+        error: error.message,
+        bookingId: booking._id,
+        userId,
+        stack: error.stack
+      });
+      throw error;
     }
+  }
 
-    const newStatus = updateData.status;
-
-    // Track who performed the action
-    if (newStatus === 'Loaded') booking.loadedBy = currentUserId;
-    if (newStatus === 'Unloaded') booking.unloadedBy = currentUserId;
-    if (newStatus === 'Delivered') booking.deliveredBy = currentUserId;
-    if (newStatus === 'Cancelled') booking.cancelledBy = currentUserId;
-
-    // Merge update data into booking (including paymentType if present)
-    Object.assign(booking, updateData);
-    booking.updatedAt = new Date();
-
-    // ✅ Fix: Check after updateData is merged into booking
-    const isDeliveringToPay =
-      booking.status === 'Delivered' &&
-      booking.lrType === 'ToPay' &&
-      !booking.isCargoBalanceCredited &&
-      typeof booking.paymentType === 'string' &&
-      booking.paymentType.length > 0;
-
-    logger.info('ToPay delivery check', {
-      bookingId: booking._id,
-      status: booking.status,
-      lrType: booking.lrType,
-      isAlreadyCredited: booking.isCargoBalanceCredited,
-      paymentType: booking.paymentType,
-      shouldCredit: isDeliveringToPay
-    });
-
-    if (newStatus === 'Delivered') {
-  const user = await User.findById(currentUserId);
-  if (!user) throw new Error('Current user not found');
-
-  user.cargoBalance = (user.cargoBalance || 0) + booking.totalAmountCharge;
-  await user.save();
-
-  // Create transaction regardless of booking type
-  await Transaction.create({
-    user: currentUserId,
-    amount: booking.totalAmountCharge,
-    balanceAfter: user.cargoBalance,
-    type: 'Booking',
-    referenceId: booking._id,
-    description: 'Transaction recorded on delivery'
-  });
-
-  // Update booking status and cargo balance credited flag
-  booking.isCargoBalanceCredited = true;
-  await booking.save();
-}
-
-    await booking.save();
-
-    logger.info('Successfully updated booking', { 
-      bookingId: booking._id,
-      status: booking.status,
-      operatorId,
-      assignedVehicle: booking.assignedVehicle,
-      loadedBy: booking.loadedBy,
-      cancelledBy: booking.cancelledBy
-    });
-
-    return booking;
-  } catch (error) {
-    logger.error('Error updating booking', { 
-      error: error.message, 
+  static async updateBooking(id, updateData, operatorId, currentUserId) {
+    logger.info('Updating booking', { 
       bookingId: id, 
       operatorId,
-      stack: error.stack 
+      updateFields: Object.keys(updateData)
     });
-    throw error;
+
+    try {
+      const booking = await Booking.findOne({ _id: id, operatorId });
+
+      if (!booking) {
+        logger.warn('Booking not found for update', { bookingId: id, operatorId });
+        throw new Error('Booking not found');
+      }
+
+      const newStatus = updateData.status;
+
+      // Track who performed the action
+      if (newStatus === 'Loaded') booking.loadedBy = currentUserId;
+      if (newStatus === 'Unloaded') booking.unloadedBy = currentUserId;
+      if (newStatus === 'Delivered') booking.deliveredBy = currentUserId;
+      if (newStatus === 'Cancelled') booking.cancelledBy = currentUserId;
+
+      // Merge update data into booking (including paymentType if present)
+      Object.assign(booking, updateData);
+      booking.updatedAt = new Date();
+
+      // Handle delivery confirmation
+      if (newStatus === 'Delivered' && booking.lrType === 'ToPay' && !booking.isCargoBalanceCredited) {
+        await this.collectPayment(booking, currentUserId);
+        booking.isCargoBalanceCredited = true;
+      }
+
+      await booking.save();
+
+      logger.info('Successfully updated booking', { 
+        bookingId: booking._id,
+        status: booking.status,
+        operatorId,
+        assignedVehicle: booking.assignedVehicle,
+        loadedBy: booking.loadedBy,
+        cancelledBy: booking.cancelledBy
+      });
+
+      return booking;
+    } catch (error) {
+      logger.error('Error updating booking', { 
+        error: error.message, 
+        bookingId: id, 
+        operatorId,
+        stack: error.stack 
+      });
+      throw error;
+    }
   }
-}
 
   static async deleteBooking(id, operatorId) {
     logger.info('Deleting booking', { bookingId: id, operatorId });

@@ -7,13 +7,13 @@ const ExportService = require('../services/ExportService');
 
 
 // Create booking
-exports.createBooking = async (req, res) => {
+exports.intiateBooking = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId();
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
-    const booking = await BookingService.createBooking(req.body, req.user._id, operatorId);
+    const booking = await BookingService.intiateBooking(req.body, req.user._id, operatorId);
     res.status(201).json(booking);
   } catch (error) {
     logger.error('Error creating booking in controller', { error: error.message });
