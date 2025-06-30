@@ -1311,6 +1311,87 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "Ewaybill",
+			"item": [
+				{
+					"name": "updateVehicleNumber",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"fromPlace\": \"Kukatpally\",\n    \"fromState\": 29,\n    \"ewbNo\": 141011741428,\n    \"vehicleNo\": \"AP39KX1234\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/ewaybill/updateVehicleNumber",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"ewaybill",
+								"updateVehicleNumber"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "updateTransporter",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"ewbNo\": 141011741428,\n    \"transporterId\": \"29AAGCB1286Q000\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/ewaybill/updateTransporter",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"ewaybill",
+								"updateTransporter"
+							]
+						}
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"auth": {
