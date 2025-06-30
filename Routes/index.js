@@ -11,8 +11,11 @@ const chartRoutes = require('./chartRoutes');
 const cashTransferRoutes = require('./cashTransferRoutes');
 const transactionRoutes = require('./transactionRoutes');
 const trackShipmentRoutes = require('./trackShipmentRoutes');
+
 const bookingReportRoutes = require('./bookingReportRoutes');
 const branchReportRoutes = require('./branchReportRoutes');
+
+const eWayBillRoutes = require('./ewayBillRoutes');
 
 router.use('/auth', authRoutes);
 router.use('/roles', roleRoutes);
@@ -25,7 +28,10 @@ router.use('/charts', chartRoutes);
 router.use('/cashtransfers', cashTransferRoutes);
 router.use('/transactions', transactionRoutes);
 router.use('/trackShipment', trackShipmentRoutes);
+
 router.use('/bookingReport', bookingReportRoutes);
 router.use('/branchReport', branchReportRoutes);
+
+router.use('/ewaybill', eWayBillRoutes);
 
 module.exports = router;
