@@ -21,7 +21,6 @@ exports.intiateBooking = async (req, res) => {
   }
 };
 
-
 exports.collectPayment = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId();
@@ -46,10 +45,6 @@ exports.collectPayment = async (req, res) => {
     res.status(500).json({ error: 'Failed to collect payment' });
   }
 };
-
-
-
-
 
 /**
  * Get all bookings

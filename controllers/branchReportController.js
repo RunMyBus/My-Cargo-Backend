@@ -1,7 +1,5 @@
 const mongoose = require('mongoose');
 const Booking = require('../models/Booking');
-const Branch = require('../models/Branch');
-const Vehicle = require('../models/Vehicle');
 const logger = require('../utils/logger');
 const requestContext = require('../utils/requestContext');
 const XLSX = require('xlsx');
@@ -54,7 +52,7 @@ exports.getBranchReport = async (req, res) => {
       freightCharge: b.freightCharge || 0,
       loadingCharge: b.loadingCharge || 0,
       unloadingCharge: b.unloadingCharge || 0,
-      otherCharge: b.otherCharge || 0
+      otherCharge: b.gst || 0
     }));
 
     let totalsRow = null;
@@ -66,7 +64,7 @@ exports.getBranchReport = async (req, res) => {
         acc.freightCharge += r.freightCharge || 0;
         acc.loadingCharge += r.loadingCharge || 0;
         acc.unloadingCharge += r.unloadingCharge || 0;
-        acc.otherCharge += r.otherCharge || 0;
+        acc.otherCharge += r.gst || 0;
         return acc;
       }, {
         quantity: 0,
@@ -154,7 +152,7 @@ exports.getRevenueReport = async (req, res) => {
       const freight = b.freightCharge || 0;
       const loading = b.loadingCharge || 0;
       const unloading = b.unloadingCharge || 0;
-      const other = b.otherCharge || 0;
+      const other = b.gst || 0;
       const total = b.totalAmountCharge || 0;
 
       const bookingExpense = freight * 0.25;
@@ -294,7 +292,7 @@ exports.exportBranchReportExcel = async (req, res) => {
       FreightCharge: b.freightCharge || 0,
       LoadingCharge: b.loadingCharge || 0,
       UnloadingCharge: b.unloadingCharge || 0,
-      OtherCharge: b.otherCharge || 0
+      OtherCharge: b.gst || 0
     }));
 
     // Totals
@@ -303,7 +301,7 @@ exports.exportBranchReportExcel = async (req, res) => {
       acc.FreightCharge += r.FreightCharge;
       acc.LoadingCharge += r.LoadingCharge;
       acc.UnloadingCharge += r.UnloadingCharge;
-      acc.OtherCharge += r.OtherCharge;
+      acc.OtherCharge += r.gst;
       return acc;
     }, {
       Quantity: 0,
@@ -378,7 +376,7 @@ exports.exportRevenueReportExcel = async (req, res) => {
       const freight = b.freightCharge || 0;
       const loading = b.loadingCharge || 0;
       const unloading = b.unloadingCharge || 0;
-      const other = b.otherCharge || 0;
+      const other = b.gst || 0;
       const total = b.totalAmountCharge || 0;
 
       const bookingExpense = freight * 0.25;
