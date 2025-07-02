@@ -8,7 +8,7 @@ router.use(passport.authenticate('jwt', { session: false }));
 // Fixed routes first (non-id params)
 router.post('/arrived', bookingController.getArrivedBookings);
 
-router.post('/intiateBooking', bookingController.intiateBooking);
+router.post('/initiateBooking', bookingController.initiateBooking);
 router.post('/unassigned', bookingController.getUnassignedBookings);
 router.post('/assigned', bookingController.getAssignedBookings);
 router.post('/in-transit', bookingController.getInTransitBookings);
@@ -19,6 +19,7 @@ router.get('/export/unassigned', bookingController.exportUnassignedBookings);
 router.get('/export/arrived', bookingController.exportArrivedBookings);
 router.get('/export/in-transit', bookingController.exportInTransitBookings);
 router.get('/all', bookingController.getAllBookings);
+router.get('/contactsByPhone/:phone', bookingController.getContactByPhone);
 
 // Dynamic routes with :id last
 router.get('/:id', bookingController.getBookingById);

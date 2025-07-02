@@ -1,9 +1,8 @@
 const mongoose = require('mongoose');
 const Booking = require('../models/Booking');
-const Branch = require('../models/Branch');
-const Vehicle = require('../models/Vehicle');
 const logger = require('../utils/logger');
 const requestContext = require('../utils/requestContext');
+const XLSX = require('xlsx');
 
 const formatDate = (dt) => dt ? new Date(dt).toISOString().slice(0, 10) : '';
 const formatTime = (dt) => dt ? new Date(dt).toTimeString().split(' ')[0] : '';
@@ -35,11 +34,12 @@ exports.getBookingReport = async (req, res) => {
       .lean();
 
     const reportData = bookings.map(b => {
-      const lastEvt = (b.eventHistory || []).slice(-1)[0];
-      const status = lastEvt?.type
-        ? lastEvt.type.charAt(0).toUpperCase() + lastEvt.type.slice(1)
-        : b.status;
-      const statusDate = lastEvt?.date || b.updatedAt;
+      const status = b.status
+        ? b.status.charAt(0).toUpperCase() + b.status.slice(1)
+        : 'Unknown';
+
+      const statusDate = b.updatedAt;
+
       return {
         date: b.bookingDate || '',
         bookingId: b.bookingId,

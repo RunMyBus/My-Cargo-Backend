@@ -1,14 +1,8 @@
-const { Parser } = require('json2csv');
+const XLSX = require('xlsx');
 const BookingService = require('./BookingService');
 
-const exportBookings = async (operatorId) => {
-  if (!operatorId) {
-    throw new Error('Operator ID is required');
-  }
-
-  const { bookings } = await BookingService.getAllBookings(operatorId);
-
-  const flattenedBookings = bookings.map((b) => ({
+const flattenBookings = (bookings) =>
+  bookings.map((b) => ({
     BookingID: b.bookingId,
     Status: b.status,
     BookingDate: b.bookingDate,
@@ -17,7 +11,7 @@ const exportBookings = async (operatorId) => {
     ToOffice: b.toOffice?.name || '',
     SenderName: b.senderName,
     SenderPhone: b.senderPhone,
-    senderAddress: b.senderAddress,
+    SenderAddress: b.senderAddress,
     ReceiverName: b.receiverName,
     ReceiverPhone: b.receiverPhone,
     ReceiverAddress: b.receiverAddress,
@@ -32,93 +26,76 @@ const exportBookings = async (operatorId) => {
     CreatedAt: b.createdAt,
   }));
 
-  const parser = new Parser();
-  const csv = parser.parse(flattenedBookings);
-  return csv;
+const generateXLSXBuffer = (data, sheetName = 'Sheet1') => {
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 };
 
-/**
- * Export unassigned bookings for an operator
- */
+const exportBookings = async (operatorId) => {
+  if (!operatorId) throw new Error('Operator ID is required');
+
+  const { bookings } = await BookingService.getAllBookings(operatorId);
+  const flattened = flattenBookings(bookings);
+  return generateXLSXBuffer(flattened, 'All Bookings');
+};
+
 const exportUnassignedBookings = async (operatorId, query = '') => {
-  if (!operatorId) {
-    throw new Error('Operator ID is required');
-  }
+  if (!operatorId) throw new Error('Operator ID is required');
 
-  const result = await BookingService.getUnassignedBookings(operatorId, 1, 10000, query);
-  const bookings = result.bookings;
+  const { bookings } = await BookingService.getUnassignedBookings(operatorId, 1, 10000, query);
+  if (!bookings.length) throw new Error('No unassigned bookings found to export');
 
-  if (!bookings.length) {
-    throw new Error('No unassigned bookings found to export');
-  }
+  const flattened = bookings.map(b => ({
+    BookingID: b.bookingId,
+    SenderName: b.senderName,
+    ReceiverName: b.receiverName,
+    BookedBy: b.bookedBy?.fullName || '',
+    FromOffice: b.fromOffice?.name || '',
+    ToOffice: b.toOffice?.name || '',
+    CreatedAt: b.createdAt,
+  }));
 
-  const fields = [
-    { label: 'Booking ID', value: 'bookingId' },
-    { label: 'Sender Name', value: 'senderName' },
-    { label: 'Receiver Name', value: 'receiverName' },
-    { label: 'Booked By', value: 'bookedBy' },
-    { label: 'From Office', value: 'fromOffice.name' },
-    { label: 'To Office', value: 'toOffice.name' },
-    { label: 'Created At', value: 'createdAt' }
-  ];
-
-  const parser = new Parser({ fields });
-  return parser.parse(bookings);
+  return generateXLSXBuffer(flattened, 'Unassigned Bookings');
 };
 
-/**
- * Export arrived bookings for an operator
- */
 const exportArrivedBookings = async (operatorId, query = '') => {
-  if (!operatorId) {
-    throw new Error('Operator ID is required');
-  }
+  if (!operatorId) throw new Error('Operator ID is required');
 
-  const result = await BookingService.getArrivedBookings(operatorId, 1, 10000, query);
-  const bookings = result.bookings;
+  const { bookings } = await BookingService.getArrivedBookings(operatorId, 1, 10000, query);
+  if (!bookings.length) throw new Error('No arrived bookings found to export');
 
-  if (!bookings.length) {
-    throw new Error('No arrived bookings found to export');
-  }
+  const flattened = bookings.map(b => ({
+    BookingID: b.bookingId,
+    SenderName: b.senderName,
+    ReceiverName: b.receiverName,
+    FromOffice: b.fromOffice?.name || '',
+    ToOffice: b.toOffice?.name || '',
+    ArrivalDate: b.arrivalDate,
+    CreatedAt: b.createdAt,
+  }));
 
-  const fields = [
-    { label: 'Booking ID', value: 'bookingId' },
-    { label: 'Sender Name', value: 'senderName' },
-    { label: 'Receiver Name', value: 'receiverName' },
-    { label: 'From Office', value: 'fromOffice.name' },
-    { label: 'To Office', value: 'toOffice.name' },
-    { label: 'Arrival Date', value: 'arrivalDate' },
-    { label: 'Created At', value: 'createdAt' }
-  ];
-
-  const parser = new Parser({ fields });
-  return parser.parse(bookings);
+  return generateXLSXBuffer(flattened, 'Arrived Bookings');
 };
 
 const exportInTransitBookings = async (operatorId, query = '') => {
-  if (!operatorId) {
-    throw new Error('Operator ID is required');
-  }
+  if (!operatorId) throw new Error('Operator ID is required');
 
-  const result = await BookingService.getInTransitBookings(operatorId, 1, 10000, query);
-  const bookings = result.bookings;
+  const { bookings } = await BookingService.getInTransitBookings(operatorId, 1, 10000, query);
+  if (!bookings.length) throw new Error('No in-transit bookings found to export');
 
-  if (!bookings.length) {
-    throw new Error('No in-transit bookings found to export');
-  }
+  const flattened = bookings.map(b => ({
+    BookingID: b.bookingId,
+    SenderName: b.senderName,
+    ReceiverName: b.receiverName,
+    FromOffice: b.fromOffice?.name || '',
+    ToOffice: b.toOffice?.name || '',
+    DispatchDate: b.dispatchDate,
+    CreatedAt: b.createdAt,
+  }));
 
-  const fields = [
-    { label: 'Booking ID', value: 'bookingId' },
-    { label: 'Sender Name', value: 'senderName' },
-    { label: 'Receiver Name', value: 'receiverName' },
-    { label: 'From Office', value: 'fromOffice.name' },
-    { label: 'To Office', value: 'toOffice.name' },
-    { label: 'Dispatch Date', value: 'dispatchDate' },
-    { label: 'Created At', value: 'createdAt' }
-  ];
-
-  const parser = new Parser({ fields });
-  return parser.parse(bookings);
+  return generateXLSXBuffer(flattened, 'In Transit Bookings');
 };
 
 module.exports = {
