@@ -4,33 +4,24 @@ const Branch = require('../models/Branch');
 const Vehicle = require('../models/Vehicle');
 const logger = require('../utils/logger');
 const requestContext = require('../utils/requestContext');
-const XLSX = require('xlsx');
+
+const formatDate = (dt) => dt ? new Date(dt).toISOString().slice(0, 10) : '';
+const formatTime = (dt) => dt ? new Date(dt).toTimeString().split(' ')[0] : '';
+const formatDateTime = (dt) => dt ? `${formatDate(dt)} ${formatTime(dt)}` : '';
+const getEventDate = (events, type) => {
+  const event = Array.isArray(events) ? events.find(ev => ev.type === type) : null;
+  return event?.date || '';
+};
 
 exports.getBookingReport = async (req, res) => {
-  const {
-    date,
-    sortField = 'bookingDate',
-    sortOrder = 'asc',
-    page = 1,
-    limit = 10
-  } = req.body;
-
+  const { date, sortField = 'bookingDate', sortOrder = 'asc', page = 1, limit = 10 } = req.body;
   const operatorId = requestContext.getOperatorId();
   const userId = req.user?._id;
 
-  if (!date || !operatorId) {
-    return res.status(400).json({ error: 'Date and operatorId are required' });
-  }
+  if (!date || !operatorId) return res.status(400).json({ error: 'Date and operatorId are required' });
 
   try {
-    const filter = {
-      bookingDate: date.trim(),
-      operatorId,
-      status: { $in: ['Booked', 'InTransit', 'Arrived', 'Delivered'] }
-    };
-
-    console.log('Booking Report Filter:', filter);
-
+    const filter = { bookingDate: date.trim(), operatorId, status: { $in: ['Booked', 'InTransit', 'Arrived', 'Delivered'] } };
     const totalRecords = await Booking.countDocuments(filter);
     const totalPages = Math.ceil(totalRecords / limit);
 
@@ -43,57 +34,49 @@ exports.getBookingReport = async (req, res) => {
       .limit(Number(limit))
       .lean();
 
-    const reportData = bookings.map(b => ({
-      date: b.bookingDate || '',
-      bookingId: b.bookingId || '',
-      senderName: b.senderName || '',
-      senderPhone: b.senderPhone || '',
-      receiverName: b.receiverName || '',
-      receiverPhone: b.receiverPhone || '',
-      fromOffice: b.fromOffice?.name || '',
-      toOffice: b.toOffice?.name || '',
-      lrType: b.lrType || '',
-      quantity: b.quantity || 0,
-      freightCharge: b.freightCharge || 0,
-      loadingCharge: b.loadingCharge || 0,
-      unloadingCharge: b.unloadingCharge || 0,
-      otherCharge: b.otherCharge || 0,
-      totalAmountCharge: b.totalAmountCharge || 0,
-      status: b.status || ''
-    }));
+    const reportData = bookings.map(b => {
+      const lastEvt = (b.eventHistory || []).slice(-1)[0];
+      const status = lastEvt?.type
+        ? lastEvt.type.charAt(0).toUpperCase() + lastEvt.type.slice(1)
+        : b.status;
+      const statusDate = lastEvt?.date || b.updatedAt;
+      return {
+        date: b.bookingDate || '',
+        bookingId: b.bookingId,
+        senderName: b.senderName || '',
+        senderPhone: b.senderPhone || '',
+        receiverName: b.receiverName || '',
+        receiverPhone: b.receiverPhone || '',
+        fromOffice: b.fromOffice?.name || '',
+        toOffice: b.toOffice?.name || '',
+        lrType: b.lrType || '',
+        quantity: b.quantity || 0,
+        freightCharge: b.freightCharge || 0,
+        loadingCharge: b.loadingCharge || 0,
+        unloadingCharge: b.unloadingCharge || 0,
+        otherCharge: b.gst || 0,
+        totalAmountCharge: b.totalAmountCharge || 0,
+        status,
+        statusDate: new Date(statusDate).toISOString()
+      };
+    });
 
     let totalsRow = null;
-
-    // Only calculate and return totalsRow on last page
     if (Number(page) === totalPages && totalRecords > 0) {
-      const allBookings = await Booking.find(filter).lean();
-      const totals = allBookings.reduce((acc, row) => {
-        acc.quantity += row.quantity || 0;
-        acc.freightCharge += row.freightCharge || 0;
-        acc.loadingCharge += row.loadingCharge || 0;
-        acc.unloadingCharge += row.unloadingCharge || 0;
-        acc.otherCharge += row.otherCharge || 0;
-        acc.totalAmountCharge += row.totalAmountCharge || 0;
+      const all = await Booking.find(filter).lean();
+      const totals = all.reduce((acc, r) => {
+        acc.quantity += r.quantity || 0;
+        acc.freightCharge += r.freightCharge || 0;
+        acc.loadingCharge += r.loadingCharge || 0;
+        acc.unloadingCharge += r.unloadingCharge || 0;
+        acc.otherCharge += r.gst || 0;
+        acc.totalAmountCharge += r.totalAmountCharge || 0;
         return acc;
-      }, {
-        quantity: 0,
-        freightCharge: 0,
-        loadingCharge: 0,
-        unloadingCharge: 0,
-        otherCharge: 0,
-        totalAmountCharge: 0
-      });
-
+      }, { quantity: 0, freightCharge: 0, loadingCharge: 0, unloadingCharge: 0, otherCharge: 0, totalAmountCharge: 0 });
       totalsRow = {
-        blankDate: '',
-        blankBookingId: '',
-        blankSenderName: '',
-        blankSenderPhone: '',
-        blankReceiverName: '',
-        blankReceiverPhone: '',
-        blankFromOffice: '',
-        blankToOffice: '',
-        blankLrType: 'TOTAL',
+        blankDate: '', blankBookingId: '', blankSenderName: '',
+        blankSenderPhone: '', blankReceiverName: '', blankReceiverPhone: '',
+        blankFromOffice: '', blankToOffice: '', blankLrType: 'TOTAL',
         blankQuantity: totals.quantity,
         blankFreightCharge: totals.freightCharge,
         blankLoadingCharge: totals.loadingCharge,
@@ -104,51 +87,22 @@ exports.getBookingReport = async (req, res) => {
       };
     }
 
-    res.json({
-      date,
-      sortBy: sortField,
-      sortOrder,
-      page: Number(page),
-      limit: Number(limit),
-      totalRecords,
-      totalPages,
-      report: reportData,
-      ...(totalsRow && { totalsRow })  // only add if it exists
-    });
-
+    res.json({ date, sortBy: sortField, sortOrder, page: Number(page), limit: Number(limit), totalRecords, totalPages, report: reportData, ...(totalsRow && { totalsRow }) });
   } catch (error) {
-    logger.error('Error generating booking report', {
-      error: error.message,
-      userId: userId?.toString(),
-      operatorId: operatorId?.toString()
-    });
+    logger.error('Error booking report', { error: error.message, userId: userId?.toString(), operatorId: operatorId?.toString() });
     res.status(500).json({ error: 'Failed to generate booking report' });
   }
 };
 
 exports.getDelivaryReport = async (req, res) => {
-  const {
-    date,
-    sortField = 'bookingDate',
-    sortOrder = 'asc',
-    page = 1,
-    limit = 10
-  } = req.body;
-
+  const { date, sortField = 'bookingDate', sortOrder = 'asc', page = 1, limit = 10 } = req.body;
   const operatorId = requestContext.getOperatorId();
   const userId = req.user?._id;
 
-  if (!date || !operatorId) {
-    return res.status(400).json({ error: 'Date and operatorId are required' });
-  }
+  if (!date || !operatorId) return res.status(400).json({ error: 'Date and operatorId are required' });
 
   try {
-    const filter = {
-      arrivalDate: date,
-      operatorId,
-      status: 'Delivered'
-    };
-
+    const filter = { arrivalDate: date, operatorId, status: 'Delivered' };
     const totalRecords = await Booking.countDocuments(filter);
     const totalPages = Math.ceil(totalRecords / limit);
 
@@ -161,51 +115,46 @@ exports.getDelivaryReport = async (req, res) => {
       .limit(Number(limit))
       .lean();
 
-    const formattedDate = date.split('-').reverse().join('/'); // dd/mm/yyyy
-
-    const reportData = bookings.map(b => ({
-      date: formattedDate,
-      bookingId: b.bookingId,
-      senderName: b.senderName || '',
-      senderPhone: b.senderPhone || '',
-      receiverName: b.receiverName || '',
-      receiverPhone: b.receiverPhone || '',
-      fromOffice: b.fromOffice?.name || '',
-      toOffice: b.toOffice?.name || '',
-      lrType: b.lrType || '',
-      deliveryType: 'Self',
-      vehicleNumber: b.assignedVehicle?.vehicleNumber || '',
-      unloading: b.unloadingDateTime || '',
-      quantity: b.quantity || 0,
-      totalAmountCharge: b.totalAmountCharge || 0,
-      freightCharge: b.freightCharge || 0,
-      loadingCharge: b.loadingCharge || 0,
-      unloadingCharge: b.unloadingCharge || 0,
-      otherCharge: b.otherCharge || 0,
-      bookingDate: b.bookingDate || '',
-      status: b.status || ''
-    }));
+    const formattedDate = date.split('-').reverse().join('/');
+    const reportData = bookings.map(b => {
+      const unloadEv = (b.eventHistory || []).find(e => e.type === 'unloaded');
+      const deliverEv = (b.eventHistory || []).find(e => e.type === 'delivered');
+      return {
+        date: formattedDate,
+        bookingId: b.bookingId,
+        senderName: b.senderName || '',
+        senderPhone: b.senderPhone || '',
+        receiverName: b.receiverName || '',
+        receiverPhone: b.receiverPhone || '',
+        fromOffice: b.fromOffice?.name || '',
+        toOffice: b.toOffice?.name || '',
+        lrType: b.lrType || '',
+        deliveryType: 'Self',
+        vehicleNumber: b.assignedVehicle?.vehicleNumber || '',
+        unloadingDate: unloadEv ? unloadEv.date : '',
+        quantity: b.quantity || 0,
+        totalAmountCharge: b.totalAmountCharge || 0,
+        freightCharge: b.freightCharge || 0,
+        loadingCharge: b.loadingCharge || 0,
+        unloadingCharge: b.unloadingCharge || 0,
+        otherCharge: b.gst || 0,
+        bookingDate: b.bookingDate || '',
+        status: b.status || ''
+      };
+    });
 
     let totalsRow = null;
-
     if (Number(page) === totalPages && totalRecords > 0) {
-      const allBookings = await Booking.find(filter).lean();
-      const totals = allBookings.reduce((acc, row) => {
-        acc.quantity += row.quantity || 0;
-        acc.freightCharge += row.freightCharge || 0;
-        acc.loadingCharge += row.loadingCharge || 0;
-        acc.unloadingCharge += row.unloadingCharge || 0;
-        acc.otherCharge += row.otherCharge || 0;
-        acc.totalAmountCharge += row.totalAmountCharge || 0;
+      const all = await Booking.find(filter).lean();
+      const totals = all.reduce((acc, r) => {
+        acc.quantity += r.quantity || 0;
+        acc.freightCharge += r.freightCharge || 0;
+        acc.loadingCharge += r.loadingCharge || 0;
+        acc.unloadingCharge += r.unloadingCharge || 0;
+        acc.otherCharge += r.gst || 0;
+        acc.totalAmountCharge += r.totalAmountCharge || 0;
         return acc;
-      }, {
-        quantity: 0,
-        freightCharge: 0,
-        loadingCharge: 0,
-        unloadingCharge: 0,
-        otherCharge: 0,
-        totalAmountCharge: 0
-      });
+      }, { quantity: 0, freightCharge: 0, loadingCharge: 0, unloadingCharge: 0, otherCharge: 0, totalAmountCharge: 0 });
 
       totalsRow = {
         blankDate: formattedDate,
@@ -219,80 +168,49 @@ exports.getDelivaryReport = async (req, res) => {
         lrType: '',
         deliveryType: '',
         vehicleNumber: '',
-        unloading: 'TOTAL',
+        unloadingDate: 'TOTAL',
         quantity: totals.quantity,
         totalAmountCharge: totals.totalAmountCharge,
-        status: '',
         freightCharge: totals.freightCharge,
         loadingCharge: totals.loadingCharge,
         unloadingCharge: totals.unloadingCharge,
-        otherCharge: totals.otherCharge
+        otherCharge: totals.otherCharge,
+        status: ''
       };
     }
 
-    res.json({
-      date,
-      sortBy: sortField,
-      sortOrder,
-      page: Number(page),
-      limit: Number(limit),
-      totalRecords,
-      totalPages,
-      report: reportData,
-      ...(totalsRow && { totalsRow }) // conditionally add if exists
-    });
-
+    res.json({ date, sortBy: sortField, sortOrder, page: Number(page), limit: Number(limit), totalRecords, totalPages, report: reportData, ...(totalsRow && { totalsRow }) });
   } catch (error) {
-    logger.error('Error generating delivery report', {
-      error: error.message,
-      userId: userId?.toString(),
-      operatorId: operatorId?.toString()
-    });
+    logger.error('Error delivery report', { error: error.message, userId: userId?.toString(), operatorId: operatorId?.toString() });
     res.status(500).json({ error: 'Failed to generate delivery report' });
   }
 };
 
 exports.getStatusReport = async (req, res) => {
-  const {
-    date,
-    sortField = 'bookingId',
-    sortOrder = 'asc',
-    page = 1,
-    limit = 10
-  } = req.body;
-
+  const { date, sortField = 'bookingId', sortOrder = 'asc', page = 1, limit = 10 } = req.body;
   const operatorId = requestContext.getOperatorId();
   const userId = req.user?._id;
 
-  if (!date || !operatorId) {
-    return res.status(400).json({ error: 'Date and operatorId are required' });
-  }
+  if (!date || !operatorId) return res.status(400).json({ error: 'Date and operatorId are required' });
 
   try {
-    const filter = {
-      bookingDate: date,
-      operatorId,
-      status: { $nin: ['Cancelled', 'Pending'] }
-    };
-
+    const filter = { bookingDate: date, operatorId, status: { $nin: ['Cancelled', 'Pending'] } };
     const totalRecords = await Booking.countDocuments(filter);
     const totalPages = Math.ceil(totalRecords / limit);
-    const skip = (page - 1) * limit;
 
     const bookings = await Booking.find(filter)
       .populate('fromOffice', 'name')
       .populate('toOffice', 'name')
       .populate('assignedVehicle', 'vehicleNumber')
       .sort({ [sortField]: sortOrder === 'desc' ? -1 : 1 })
-      .skip(skip)
+      .skip((page - 1) * limit)
       .limit(Number(limit))
       .lean();
 
     const report = bookings.map(b => {
+      const unloadEv = (b.eventHistory || []).find(e => e.type === 'unloaded');
+      const deliverEv = (b.eventHistory || []).find(e => e.type === 'delivered');
       const created = new Date(b.createdAt);
-      const unloaded = b.unloadingDateTime ? new Date(b.unloadingDateTime) : null;
-      const delivered = b.deliveredAt ? new Date(b.deliveredAt) : null;
-
       return {
         bookingId: b.bookingId,
         fromOffice: b.fromOffice?.name || '',
@@ -301,45 +219,32 @@ exports.getStatusReport = async (req, res) => {
         lrType: b.lrType || '',
         status: b.status || '',
         vehicleNumber: b.assignedVehicle?.vehicleNumber || '',
-
         dateOfBooking: created.toISOString().slice(0, 10),
         timeOfBooking: created.toTimeString().split(' ')[0],
-
-        unloadedDate: unloaded ? unloaded.toISOString().slice(0, 10) : '',
-        unloadedTime: unloaded ? unloaded.toTimeString().split(' ')[0] : '',
-
-        deliveredDate: delivered ? delivered.toISOString().slice(0, 10) : '',
-        deliveredTime: delivered ? delivered.toTimeString().split(' ')[0] : '',
-
+        unloadedDate: unloadEv ? unloadEv.date.toISOString().slice(0, 10) : '',
+        unloadedTime: unloadEv ? unloadEv.date.toTimeString().split(' ')[0] : '',
+        deliveredDate: deliverEv ? deliverEv.date.toISOString().slice(0, 10) : '',
+        deliveredTime: deliverEv ? deliverEv.date.toTimeString().split(' ')[0] : '',
         freightCharge: b.freightCharge || 0,
         loadingCharge: b.loadingCharge || 0,
         unloadingCharge: b.unloadingCharge || 0,
-        otherCharge: b.otherCharge || 0,
+        otherCharge: b.gst || 0,
         totalAmountCharge: b.totalAmountCharge || 0
       };
     });
 
     let totalsRow = null;
-
-    // Compute totals only if it's the last page and records exist
     if (Number(page) === totalPages && totalRecords > 0) {
-      const allBookings = await Booking.find(filter).lean();
-      const totals = allBookings.reduce((acc, r) => {
+      const all = await Booking.find(filter).lean();
+      const totals = all.reduce((acc, r) => {
         acc.quantity += r.quantity || 0;
         acc.freightCharge += r.freightCharge || 0;
         acc.loadingCharge += r.loadingCharge || 0;
         acc.unloadingCharge += r.unloadingCharge || 0;
-        acc.otherCharge += r.otherCharge || 0;
+        acc.otherCharge += r.gst || 0;
         acc.totalAmountCharge += r.totalAmountCharge || 0;
         return acc;
-      }, {
-        quantity: 0,
-        freightCharge: 0,
-        loadingCharge: 0,
-        unloadingCharge: 0,
-        otherCharge: 0,
-        totalAmountCharge: 0
-      });
+      }, { quantity: 0, freightCharge: 0, loadingCharge: 0, unloadingCharge: 0, otherCharge: 0, totalAmountCharge: 0 });
 
       totalsRow = {
         bookingId: '',
@@ -363,37 +268,15 @@ exports.getStatusReport = async (req, res) => {
       };
     }
 
-    res.json({
-      date,
-      sortField,
-      sortOrder,
-      page: Number(page),
-      limit: Number(limit),
-      totalRecords,
-      totalPages,
-      report,
-      ...(totalsRow && { totalsRow })
-    });
-
+    res.json({ date, sortField, sortOrder, page: Number(page), limit: Number(limit), totalRecords, totalPages, report, ...(totalsRow && { totalsRow }) });
   } catch (error) {
-    logger.error('Error generating status report', {
-      error: error.message,
-      userId: userId?.toString(),
-      operatorId: operatorId?.toString()
-    });
+    logger.error('Error status report', { error: error.message, userId: userId?.toString(), operatorId: operatorId?.toString() });
     res.status(500).json({ error: 'Failed to generate status report' });
   }
 };
 
 exports.getLoadingReport = async (req, res) => {
-  const {
-    date,
-    sortField = 'loadingDateTime',
-    sortOrder = 'asc',
-    page = 1,
-    limit = 10
-  } = req.body;
-
+  const { date, sortField = 'date', sortOrder = 'asc', page = 1, limit = 10 } = req.body;
   const operatorId = requestContext.getOperatorId();
   const userId = req.user?._id;
 
@@ -403,8 +286,8 @@ exports.getLoadingReport = async (req, res) => {
 
   try {
     const filter = {
-      bookingDate: date,
       operatorId,
+      bookingDate: date,
       status: 'InTransit'
     };
 
@@ -416,50 +299,40 @@ exports.getLoadingReport = async (req, res) => {
       .populate('fromOffice', 'name')
       .populate('toOffice', 'name')
       .populate('assignedVehicle', 'vehicleNumber')
-      .sort({ [sortField]: sortOrder === 'desc' ? -1 : 1 })
-      .skip(skip)
-      .limit(Number(limit))
       .lean();
 
     const report = bookings.map(b => {
-      const loadingDateTime = b.loadingDateTime || b.createdAt;
-      const loadingDate = new Date(loadingDateTime);
-
+      const dt = getEventDate(b.eventHistory, 'loaded') || b.createdAt;
       return {
         bookingDate: b.bookingDate,
-        loadingDateTime: loadingDate.toISOString(),
+        loadingDateTime: formatDateTime(dt),
         bookingId: b.bookingId,
         vehicleNumber: b.assignedVehicle?.vehicleNumber || '',
         fromOffice: b.fromOffice?.name || '',
         toOffice: b.toOffice?.name || '',
         status: b.status,
-        noOfBookings: 1,
         quantity: b.quantity || 0,
         freightCharge: b.freightCharge || 0,
-        otherCharge: b.otherCharge || 0,
+        otherCharge: b.gst || 0,
         totalAmountCharge: b.totalAmountCharge || 0
       };
-    });
+    }).sort((a, b) => {
+      return sortOrder === 'desc'
+        ? new Date(b.loadingDateTime) - new Date(a.loadingDateTime)
+        : new Date(a.loadingDateTime) - new Date(b.loadingDateTime);
+    }).slice(skip, skip + limit);
 
     let totalsRow = null;
-
-    // Compute totals if it's the last page and data exists
     if (Number(page) === totalPages && totalRecords > 0) {
-      const allBookings = await Booking.find(filter).lean();
-      const totals = allBookings.reduce((acc, r) => {
-        acc.noOfBookings += 1;
+      const all = await Booking.find(filter).lean();
+      const totals = all.reduce((acc, r) => {
         acc.quantity += r.quantity || 0;
         acc.freightCharge += r.freightCharge || 0;
-        acc.otherCharge += r.otherCharge || 0;
+        acc.otherCharge += r.gst || 0;
         acc.totalAmountCharge += r.totalAmountCharge || 0;
+        acc.noOfBookings += 1;
         return acc;
-      }, {
-        noOfBookings: 0,
-        quantity: 0,
-        freightCharge: 0,
-        otherCharge: 0,
-        totalAmountCharge: 0
-      });
+      }, { quantity: 0, freightCharge: 0, otherCharge: 0, totalAmountCharge: 0, noOfBookings: 0 });
 
       totalsRow = {
         bookingDate: '',
@@ -477,21 +350,10 @@ exports.getLoadingReport = async (req, res) => {
       };
     }
 
-    res.json({
-      date,
-      sortField,
-      sortOrder,
-      page: Number(page),
-      limit: Number(limit),
-      totalRecords,
-      totalPages,
-      report,
-      ...(totalsRow && { totalsRow })
-    });
-
-  } catch (error) {
+    res.json({ date, sortField, sortOrder, page, limit, totalRecords, totalPages, report, ...(totalsRow && { totalsRow }) });
+  } catch (err) {
     logger.error('Error generating loading report', {
-      error: error.message,
+      error: err.message,
       userId: userId?.toString(),
       operatorId: operatorId?.toString()
     });
@@ -500,14 +362,7 @@ exports.getLoadingReport = async (req, res) => {
 };
 
 exports.getUnloadingReport = async (req, res) => {
-  const {
-    date,
-    sortField = 'loadingDateTime',
-    sortOrder = 'asc',
-    page = 1,
-    limit = 10
-  } = req.body;
-
+  const { date, sortField = 'date', sortOrder = 'asc', page = 1, limit = 10 } = req.body;
   const operatorId = requestContext.getOperatorId();
   const userId = req.user?._id;
 
@@ -517,8 +372,8 @@ exports.getUnloadingReport = async (req, res) => {
 
   try {
     const filter = {
-      bookingDate: date,
       operatorId,
+      bookingDate: date,
       status: 'Arrived'
     };
 
@@ -530,50 +385,42 @@ exports.getUnloadingReport = async (req, res) => {
       .populate('fromOffice', 'name')
       .populate('toOffice', 'name')
       .populate('assignedVehicle', 'vehicleNumber')
-      .sort({ [sortField]: sortOrder === 'desc' ? -1 : 1 })
-      .skip(skip)
-      .limit(Number(limit))
       .lean();
 
     const report = bookings.map(b => {
-      const loadingDateTime = b.loadingDateTime || b.createdAt;
-      const loadingDate = new Date(loadingDateTime);
-
+      const loadedDt = getEventDate(b.eventHistory, 'loaded') || b.createdAt;
+      const unloadedDt = getEventDate(b.eventHistory, 'unloaded');
       return {
         bookingDate: b.bookingDate,
-        loadingDateTime: loadingDate.toISOString(),
-        unloadingDateTime: b.unloadingDateTime || '',
+        loadingDateTime: formatDateTime(loadedDt),
+        unloadingDateTime: formatDateTime(unloadedDt),
         bookingId: b.bookingId,
         vehicleNumber: b.assignedVehicle?.vehicleNumber || '',
         fromOffice: b.fromOffice?.name || '',
         toOffice: b.toOffice?.name || '',
         status: b.status,
-        noOfBookings: 1,
         quantity: b.quantity || 0,
         freightCharge: b.freightCharge || 0,
-        otherCharge: b.otherCharge || 0,
+        otherCharge: b.gst || 0,
         totalAmountCharge: b.totalAmountCharge || 0
       };
-    });
+    }).sort((a, b) => {
+      return sortOrder === 'desc'
+        ? new Date(b.unloadingDateTime || 0) - new Date(a.unloadingDateTime || 0)
+        : new Date(a.unloadingDateTime || 0) - new Date(b.unloadingDateTime || 0);
+    }).slice(skip, skip + limit);
 
     let totalsRow = null;
-
     if (Number(page) === totalPages && totalRecords > 0) {
-      const allBookings = await Booking.find(filter).lean();
-      const totals = allBookings.reduce((acc, r) => {
-        acc.noOfBookings += 1;
+      const all = await Booking.find(filter).lean();
+      const totals = all.reduce((acc, r) => {
         acc.quantity += r.quantity || 0;
         acc.freightCharge += r.freightCharge || 0;
-        acc.otherCharge += r.otherCharge || 0;
+        acc.otherCharge += r.gst || 0;
         acc.totalAmountCharge += r.totalAmountCharge || 0;
+        acc.noOfBookings += 1;
         return acc;
-      }, {
-        noOfBookings: 0,
-        quantity: 0,
-        freightCharge: 0,
-        otherCharge: 0,
-        totalAmountCharge: 0
-      });
+      }, { quantity: 0, freightCharge: 0, otherCharge: 0, totalAmountCharge: 0, noOfBookings: 0 });
 
       totalsRow = {
         bookingDate: '',
@@ -592,21 +439,10 @@ exports.getUnloadingReport = async (req, res) => {
       };
     }
 
-    res.json({
-      date,
-      sortField,
-      sortOrder,
-      page: Number(page),
-      limit: Number(limit),
-      totalRecords,
-      totalPages,
-      report,
-      ...(totalsRow && { totalsRow }) // only include if it's set
-    });
-
-  } catch (error) {
+    res.json({ date, sortField, sortOrder, page, limit, totalRecords, totalPages, report, ...(totalsRow && { totalsRow }) });
+  } catch (err) {
     logger.error('Error generating unloading report', {
-      error: error.message,
+      error: err.message,
       userId: userId?.toString(),
       operatorId: operatorId?.toString()
     });
@@ -642,21 +478,17 @@ exports.getIGCLreport = async (req, res) => {
       .limit(Number(limit))
       .lean();
 
-    const formatDate = (dt) => {
-      if (!dt) return '';
-      const d = new Date(dt);
-      return d.toISOString().split('T')[0];
-    };
+    const formatDate = (dt) => dt ? new Date(dt).toISOString().split('T')[0] : '';
+    const formatDateTime = (dt) => dt ? new Date(dt).toISOString().replace('T', ' ').split('.')[0] : '';
 
-    const formatDateTime = (dt) => {
-      if (!dt) return '';
-      const d = new Date(dt);
-      return `${d.toISOString().split('T')[0]} ${d.toTimeString().split(' ')[0]}`;
+    const getEventDate = (events, type) => {
+      const e = Array.isArray(events) ? events.find(ev => ev.type === type) : null;
+      return e?.date || '';
     };
 
     const report = bookings.map(b => ({
       bookingDate: formatDate(b.bookingDate),
-      loadingDateTime: formatDateTime(b.loadingDateTime || b.loadingDate),
+      loadingDateTime: formatDateTime(getEventDate(b.eventHistory, 'loaded') || b.loadingDate),
       bookingId: b.bookingId,
       fromOffice: b.fromOffice?.name || '',
       toOffice: b.toOffice?.name || '',
@@ -665,7 +497,7 @@ exports.getIGCLreport = async (req, res) => {
       freightCharge: b.freightCharge || 0,
       loadingCharge: b.loadingCharge || 0,
       unloadingCharge: b.unloadingCharge || 0,
-      otherCharge: b.otherCharge || 0,
+      otherCharge: b.gst || 0,
       totalAmountCharge: b.totalAmountCharge || 0
     }));
 
@@ -678,7 +510,7 @@ exports.getIGCLreport = async (req, res) => {
         acc.freightCharge += r.freightCharge || 0;
         acc.loadingCharge += r.loadingCharge || 0;
         acc.unloadingCharge += r.unloadingCharge || 0;
-        acc.otherCharge += r.otherCharge || 0;
+        acc.otherCharge += r.gst || 0;
         acc.totalAmountCharge += r.totalAmountCharge || 0;
         return acc;
       }, {
@@ -754,21 +586,16 @@ exports.getOGCLreport = async (req, res) => {
       .limit(Number(limit))
       .lean();
 
-    const formatDate = (dt) => {
-      if (!dt) return '';
-      const d = new Date(dt);
-      return d.toISOString().split('T')[0];
-    };
-
-    const formatDateTime = (dt) => {
-      if (!dt) return '';
-      const d = new Date(dt);
-      return `${d.toISOString().split('T')[0]} ${d.toTimeString().split(' ')[0]}`;
+    const formatDate = (dt) => dt ? new Date(dt).toISOString().split('T')[0] : '';
+    const formatDateTime = (dt) => dt ? new Date(dt).toISOString().replace('T', ' ').split('.')[0] : '';
+    const getEventDate = (events, type) => {
+      const e = Array.isArray(events) ? events.find(ev => ev.type === type) : null;
+      return e?.date || '';
     };
 
     const report = bookings.map(b => ({
       bookingDate: formatDate(b.bookingDate),
-      loadingDateTime: formatDateTime(b.loadingDateTime || b.loadingDate),
+      loadingDateTime: formatDateTime(getEventDate(b.eventHistory, 'loaded') || b.loadingDate),
       bookingId: b.bookingId,
       fromOffice: b.fromOffice?.name || '',
       toOffice: b.toOffice?.name || '',
@@ -777,7 +604,7 @@ exports.getOGCLreport = async (req, res) => {
       freightCharge: b.freightCharge || 0,
       loadingCharge: b.loadingCharge || 0,
       unloadingCharge: b.unloadingCharge || 0,
-      otherCharge: b.otherCharge || 0,
+      otherCharge: b.gst || 0,
       totalAmountCharge: b.totalAmountCharge || 0
     }));
 
@@ -790,7 +617,7 @@ exports.getOGCLreport = async (req, res) => {
         acc.freightCharge += r.freightCharge || 0;
         acc.loadingCharge += r.loadingCharge || 0;
         acc.unloadingCharge += r.unloadingCharge || 0;
-        acc.otherCharge += r.otherCharge || 0;
+        acc.otherCharge += r.gst || 0;
         acc.totalAmountCharge += r.totalAmountCharge || 0;
         return acc;
       }, {
@@ -843,10 +670,6 @@ exports.exportBookingReportExcel = async (req, res) => {
   const operatorId = requestContext.getOperatorId();
   const userId = req.user?._id;
 
-  if (!date || !operatorId) {
-    return res.status(400).json({ error: 'Date and operatorId are required' });
-  }
-
   try {
     const filter = {
       bookingDate: date.trim(),
@@ -856,17 +679,21 @@ exports.exportBookingReportExcel = async (req, res) => {
 
     const order = sortOrder === 'desc' ? -1 : 1;
 
-    // Fetch all bookings in one query
     const bookings = await Booking.find(filter)
       .populate('fromOffice', 'name')
       .populate('toOffice', 'name')
-      .populate('assignedVehicle', 'vehicleNumber') // Only include if used
+      .populate('assignedVehicle', 'vehicleNumber')
       .sort({ [sortField]: order })
       .lean();
 
-    const formattedDate = date.split('-').reverse().join('/'); // Convert to dd/mm/yyyy format
+    const formattedDate = date.split('-').reverse().join('/'); // dd/mm/yyyy
 
-    // Build report data
+    const formatDateTime = (dt) => dt ? new Date(dt).toISOString().replace('T', ' ').split('.')[0] : '';
+    const getEventDate = (events, type) => {
+      const e = Array.isArray(events) ? events.find(ev => ev.type === type) : null;
+      return e?.date || '';
+    };
+
     const reportData = bookings.map(b => ({
       Date: formattedDate,
       BookingID: b.bookingId || '',
@@ -881,18 +708,18 @@ exports.exportBookingReportExcel = async (req, res) => {
       FreightCharge: b.freightCharge || 0,
       LoadingCharge: b.loadingCharge || 0,
       UnloadingCharge: b.unloadingCharge || 0,
-      OtherCharge: b.otherCharge || 0,
+      OtherCharge: b.gst || 0,
       TotalAmountCharge: b.totalAmountCharge || 0,
+      LoadingDateTime: formatDateTime(getEventDate(b.eventHistory, 'loaded')),
       status: b.status
     }));
 
-    // Totals row
     const totals = bookings.reduce((acc, row) => {
       acc.Quantity += row.quantity || 0;
       acc.FreightCharge += row.freightCharge || 0;
       acc.LoadingCharge += row.loadingCharge || 0;
       acc.UnloadingCharge += row.unloadingCharge || 0;
-      acc.OtherCharge += row.otherCharge || 0;
+      acc.OtherCharge += row.gst || 0;
       acc.TotalAmountCharge += row.totalAmountCharge || 0;
       return acc;
     }, {
@@ -920,16 +747,16 @@ exports.exportBookingReportExcel = async (req, res) => {
       UnloadingCharge: totals.UnloadingCharge,
       OtherCharge: totals.OtherCharge,
       TotalAmountCharge: totals.TotalAmountCharge,
+      LoadingDateTime: '',
       status: ''
     });
 
-    // Generate Excel
     const worksheet = XLSX.utils.json_to_sheet(reportData, {
       header: [
         'Date', 'BookingID', 'SenderName', 'SenderPhone', 'ReceiverName', 'ReceiverPhone',
         'FromOffice', 'ToOffice', 'LRType', 'Quantity', 'FreightCharge',
-        'LoadingCharge', 'UnloadingCharge', 'OtherCharge', 'TotalAmountCharge', 'status'
-        // 'VehicleNumber' // add if included above
+        'LoadingCharge', 'UnloadingCharge', 'OtherCharge', 'TotalAmountCharge',
+        'LoadingDateTime', 'status'
       ]
     });
 
@@ -958,10 +785,6 @@ exports.exportDelivaryReportExcel = async (req, res) => {
   const operatorId = requestContext.getOperatorId();
   const userId = req.user?._id;
 
-  if (!date || !operatorId) {
-    return res.status(400).json({ error: 'Date and operatorId are required' });
-  }
-
   try {
     const filter = {
       arrivalDate: date,
@@ -979,6 +802,11 @@ exports.exportDelivaryReportExcel = async (req, res) => {
       .lean();
 
     const formattedDate = date.split('-').reverse().join('/'); // dd/mm/yyyy
+    const formatDateTime = (dt) => dt ? new Date(dt).toISOString().replace('T', ' ').split('.')[0] : '';
+    const getEventDate = (events, type) => {
+      const e = Array.isArray(events) ? events.find(ev => ev.type === type) : null;
+      return e?.date || '';
+    };
 
     const reportData = bookings.map(b => ({
       Date: formattedDate,
@@ -992,25 +820,23 @@ exports.exportDelivaryReportExcel = async (req, res) => {
       LRType: b.lrType || '',
       DeliveryType: 'Self',
       VehicleNumber: b.assignedVehicle?.vehicleNumber || '',
-      Unloading: b.unloadingDateTime || '',
+      Unloading: formatDateTime(getEventDate(b.eventHistory, 'unloaded')),
       Quantity: b.quantity || 0,
       FreightCharge: b.freightCharge || 0,
       LoadingCharge: b.loadingCharge || 0,
       UnloadingCharge: b.unloadingCharge || 0,
-      OtherCharge: b.otherCharge || 0,
+      OtherCharge: b.gst || 0,
       TotalAmountCharge: b.totalAmountCharge || 0,
       status: b.status
     }));
 
-    // Totals over all matching documents
-    const allBookings = await Booking.find(filter).lean();
-    const totals = allBookings.reduce((acc, row) => {
+    const totals = bookings.reduce((acc, row) => {
       acc.Quantity += row.quantity || 0;
       acc.TotalAmountCharge += row.totalAmountCharge || 0;
       acc.FreightCharge += row.freightCharge || 0;
       acc.LoadingCharge += row.loadingCharge || 0;
       acc.UnloadingCharge += row.unloadingCharge || 0;
-      acc.OtherCharge += row.otherCharge || 0;
+      acc.OtherCharge += row.gst || 0;
       return acc;
     }, {
       Quantity: 0,
@@ -1021,7 +847,6 @@ exports.exportDelivaryReportExcel = async (req, res) => {
       OtherCharge: 0
     });
 
-    // Add total row
     reportData.push({
       Date: '',
       BookingID: '',
@@ -1044,7 +869,6 @@ exports.exportDelivaryReportExcel = async (req, res) => {
       status: ''
     });
 
-    // Generate Excel
     const worksheet = XLSX.utils.json_to_sheet(reportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Delivery Report');
@@ -1054,29 +878,22 @@ exports.exportDelivaryReportExcel = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename=delivery_report_${date}.xlsx`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.send(buffer);
+
   } catch (error) {
     logger.error('Error exporting delivery report to Excel', {
       error: error.message,
       userId: userId?.toString(),
       operatorId: operatorId?.toString()
     });
-    res.status(500).json({ error: 'Failed to export delivery report' });
+    res.status(500).json({ error: 'Failed to export booking report' });
   }
 };
 
 exports.exportStatusReportExcel = async (req, res) => {
-  const {
-    date,
-    sortField = 'bookingId',
-    sortOrder = 'asc',
-  } = req.query;
+  const { date, sortField = 'bookingId', sortOrder = 'asc' } = req.query;
 
   const operatorId = requestContext.getOperatorId();
   const userId = req.user?._id;
-
-  if (!date || !operatorId) {
-    return res.status(400).json({ error: 'Date and operatorId are required' });
-  }
 
   try {
     const filter = {
@@ -1095,9 +912,8 @@ exports.exportStatusReportExcel = async (req, res) => {
       .lean();
 
     const reportData = bookings.map(b => {
-      const created = new Date(b.createdAt);
-      const unloaded = b.unloadingDateTime ? new Date(b.unloadingDateTime) : null;
-      const delivered = b.deliveredAt ? new Date(b.deliveredAt) : null;
+      const unloadedAt = getEventDate(b.eventHistory, 'loaded');
+      const deliveredAt = getEventDate(b.eventHistory, 'unloaded');
 
       return {
         BookingID: b.bookingId,
@@ -1108,31 +924,30 @@ exports.exportStatusReportExcel = async (req, res) => {
         Status: b.status || '',
         VehicleNumber: b.assignedVehicle?.vehicleNumber || '',
 
-        DateOfBooking: created.toISOString().slice(0, 10),
-        TimeOfBooking: created.toTimeString().split(' ')[0],
+        DateOfBooking: formatDate(b.createdAt),
+        TimeOfBooking: formatTime(b.createdAt),
 
-        UnloadedDate: unloaded ? unloaded.toISOString().slice(0, 10) : '',
-        UnloadedTime: unloaded ? unloaded.toTimeString().split(' ')[0] : '',
+        UnloadedDate: formatDate(unloadedAt),
+        UnloadedTime: formatTime(unloadedAt),
 
-        DeliveredDate: delivered ? delivered.toISOString().slice(0, 10) : '',
-        DeliveredTime: delivered ? delivered.toTimeString().split(' ')[0] : '',
+        DeliveredDate: formatDate(deliveredAt),
+        DeliveredTime: formatTime(deliveredAt),
 
         FreightCharge: b.freightCharge || 0,
         LoadingCharge: b.loadingCharge || 0,
         UnloadingCharge: b.unloadingCharge || 0,
-        OtherCharge: b.otherCharge || 0,
+        OtherCharge: b.gst || 0,
         TotalAmountCharge: b.totalAmountCharge || 0,
         status: b.status
       };
     });
 
-    // Calculate totals for all matching bookings
     const totals = bookings.reduce((acc, r) => {
       acc.Quantity += r.quantity || 0;
       acc.FreightCharge += r.freightCharge || 0;
       acc.LoadingCharge += r.loadingCharge || 0;
       acc.UnloadingCharge += r.unloadingCharge || 0;
-      acc.OtherCharge += r.otherCharge || 0;
+      acc.OtherCharge += r.gst || 0;
       acc.TotalAmountCharge += r.totalAmountCharge || 0;
       return acc;
     }, {
@@ -1144,7 +959,6 @@ exports.exportStatusReportExcel = async (req, res) => {
       TotalAmountCharge: 0
     });
 
-    // Add a totals row at the end
     reportData.push({
       BookingID: '',
       FromOffice: '',
@@ -1167,15 +981,12 @@ exports.exportStatusReportExcel = async (req, res) => {
       status: ''
     });
 
-    // Create worksheet and workbook
     const worksheet = XLSX.utils.json_to_sheet(reportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Status Report');
 
-    // Write workbook buffer
     const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
 
-    // Set headers and send file
     res.setHeader('Content-Disposition', `attachment; filename=status_report_${date}.xlsx`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.send(buffer);
@@ -1191,11 +1002,7 @@ exports.exportStatusReportExcel = async (req, res) => {
 };
 
 exports.exportLoadingReportExcel = async (req, res) => {
-  const {
-    date,
-    sortField = 'loadingDateTime',
-    sortOrder = 'asc',
-  } = req.query;
+  const { date, sortField = 'LoadingDateTime', sortOrder = 'asc' } = req.query;
 
   const operatorId = requestContext.getOperatorId();
   const userId = req.user?._id;
@@ -1217,16 +1024,16 @@ exports.exportLoadingReportExcel = async (req, res) => {
       .populate('fromOffice', 'name')
       .populate('toOffice', 'name')
       .populate('assignedVehicle', 'vehicleNumber')
-      .sort({ [sortField]: order })
       .lean();
 
+    // Map and add loading date
     const reportData = bookings.map(b => {
-      const loadingDateTime = b.loadingDateTime || b.createdAt;
-      const loadingDate = new Date(loadingDateTime);
+      const loadedAt = getEventDate(b.eventHistory, 'loaded') || b.createdAt;
+      const loadingDate = loadedAt ? new Date(loadedAt).toISOString() : '';
 
       return {
         BookingDate: b.bookingDate,
-        LoadingDateTime: loadingDate.toISOString(),
+        LoadingDateTime: loadingDate,
         BookingId: b.bookingId,
         VehicleNumber: b.assignedVehicle?.vehicleNumber || '',
         FromOffice: b.fromOffice?.name || '',
@@ -1235,16 +1042,26 @@ exports.exportLoadingReportExcel = async (req, res) => {
         NoOfBookings: 1,
         Quantity: b.quantity || 0,
         FreightCharge: b.freightCharge || 0,
-        OtherCharge: b.otherCharge || 0,
+        OtherCharge: b.gst || 0,
         TotalAmountCharge: b.totalAmountCharge || 0
       };
+    });
+
+    // Sort here, because sortField in DB might not exist (e.g., LoadingDateTime is derived)
+    reportData.sort((a, b) => {
+      if (sortField === 'LoadingDateTime') {
+        const dateA = new Date(a.LoadingDateTime || 0);
+        const dateB = new Date(b.LoadingDateTime || 0);
+        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+      }
+      return 0; // fallback no sort
     });
 
     const totals = bookings.reduce((acc, b) => {
       acc.NoOfBookings += 1;
       acc.Quantity += b.quantity || 0;
       acc.FreightCharge += b.freightCharge || 0;
-      acc.OtherCharge += b.otherCharge || 0;
+      acc.OtherCharge += b.gst || 0;
       acc.TotalAmountCharge += b.totalAmountCharge || 0;
       return acc;
     }, {
@@ -1291,11 +1108,7 @@ exports.exportLoadingReportExcel = async (req, res) => {
 };
 
 exports.exportUnloadingReportExcel = async (req, res) => {
-  const {
-    date,
-    sortField = 'loadingDateTime',
-    sortOrder = 'asc',
-  } = req.query;
+  const { date, sortField = 'UnloadingDateTime', sortOrder = 'asc' } = req.query;
 
   const operatorId = requestContext.getOperatorId();
   const userId = req.user?._id;
@@ -1305,37 +1118,30 @@ exports.exportUnloadingReportExcel = async (req, res) => {
   }
 
   try {
-    // Build filter
     const filter = {
       bookingDate: date,
       operatorId,
-      status: 'Arrived' // Change this to $in: [...] if needed
+      status: 'Arrived'
     };
 
-    const order = sortOrder === 'desc' ? -1 : 1;
-
-    // Fetch all matching bookings (no pagination for export)
     const bookings = await Booking.find(filter)
       .populate('fromOffice', 'name')
       .populate('toOffice', 'name')
       .populate('assignedVehicle', 'vehicleNumber')
-      .sort({ [sortField]: order })
       .lean();
 
-    // If no bookings found, return early with a message
-    if (!bookings || bookings.length === 0) {
+    if (!bookings.length) {
       return res.status(404).json({ error: 'No unloading bookings found for the given date' });
     }
 
-    // Prepare report rows
     const reportData = bookings.map(b => {
-      const loadingDateTime = b.loadingDateTime || b.createdAt;
-      const unloadingDateTime = b.unloadingDateTime || '';
+      const loadingTime = getEventDate(b.eventHistory, 'loaded') || b.createdAt;
+      const unloadingTime = getEventDate(b.eventHistory, 'unloaded') || '';
 
       return {
         BookingDate: b.bookingDate || '',
-        LoadingDateTime: new Date(loadingDateTime).toISOString(),
-        UnloadingDateTime: unloadingDateTime ? new Date(unloadingDateTime).toISOString() : '',
+        LoadingDateTime: loadingTime ? new Date(loadingTime).toISOString() : '',
+        UnloadingDateTime: unloadingTime ? new Date(unloadingTime).toISOString() : '',
         BookingId: b.bookingId || '',
         VehicleNumber: b.assignedVehicle?.vehicleNumber || '',
         FromOffice: b.fromOffice?.name || '',
@@ -1344,17 +1150,25 @@ exports.exportUnloadingReportExcel = async (req, res) => {
         NoOfBookings: 1,
         Quantity: b.quantity || 0,
         FreightCharge: b.freightCharge || 0,
-        OtherCharge: b.otherCharge || 0,
+        OtherCharge: b.gst || 0,
         TotalAmountCharge: b.totalAmountCharge || 0
       };
     });
 
-    // Totals calculation
+    reportData.sort((a, b) => {
+      if (sortField === 'UnloadingDateTime') {
+        const dateA = new Date(a.UnloadingDateTime || 0);
+        const dateB = new Date(b.UnloadingDateTime || 0);
+        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+      }
+      return 0;
+    });
+
     const totals = bookings.reduce((acc, b) => {
       acc.NoOfBookings += 1;
       acc.Quantity += b.quantity || 0;
       acc.FreightCharge += b.freightCharge || 0;
-      acc.OtherCharge += b.otherCharge || 0;
+      acc.OtherCharge += b.gst || 0;
       acc.TotalAmountCharge += b.totalAmountCharge || 0;
       return acc;
     }, {
@@ -1362,10 +1176,9 @@ exports.exportUnloadingReportExcel = async (req, res) => {
       Quantity: 0,
       FreightCharge: 0,
       OtherCharge: 0,
-      TotalAmountCharge: 0,
+      TotalAmountCharge: 0
     });
 
-    // Push totals row
     reportData.push({
       BookingDate: '',
       LoadingDateTime: '',
@@ -1382,15 +1195,12 @@ exports.exportUnloadingReportExcel = async (req, res) => {
       TotalAmountCharge: totals.TotalAmountCharge
     });
 
-    // Create Excel sheet and workbook
     const worksheet = XLSX.utils.json_to_sheet(reportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Unloading Report');
 
-    // Generate Excel buffer
     const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
 
-    // Set headers and send Excel file
     res.setHeader('Content-Disposition', `attachment; filename=unloading_report_${date}.xlsx`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.send(buffer);
@@ -1410,10 +1220,6 @@ exports.exportIGCLReportExcel = async (req, res) => {
   const operatorId = requestContext.getOperatorId();
   const userId = req.user?._id;
 
-  if (!date || !operatorId) {
-    return res.status(400).json({ error: 'Date and operatorId are required' });
-  }
-
   try {
     const filter = {
       operatorId,
@@ -1427,41 +1233,39 @@ exports.exportIGCLReportExcel = async (req, res) => {
       .populate('assignedVehicle', 'vehicleNumber')
       .lean();
 
-    const formatDate = (dt) => {
-      if (!dt) return '';
-      const d = new Date(dt);
-      return d.toISOString().split('T')[0];
-    };
-
+    const formatDate = (dt) => dt ? new Date(dt).toISOString().split('T')[0] : '';
     const formatDateTime = (dt) => {
       if (!dt) return '';
       const d = new Date(dt);
       return `${d.toISOString().split('T')[0]} ${d.toTimeString().split(' ')[0]}`;
     };
 
-    const report = bookings.map(b => ({
-      BookingDate: formatDate(b.bookingDate),
-      LoadingDateTime: formatDateTime(b.loadingDateTime || b.loadingDate),
-      BookingId: b.bookingId,
-      FromOffice: b.fromOffice?.name || '',
-      ToOffice: b.toOffice?.name || '',
-      VehicleNumber: b.assignedVehicle?.vehicleNumber || '',
-      Quantity: b.quantity || 0,
-      FreightCharge: b.freightCharge || 0,
-      LoadingCharge: b.loadingCharge || 0,
-      UnloadingCharge: b.unloadingCharge || 0,
-      OtherCharge: b.otherCharge || 0,
-      TotalAmountCharge: b.totalAmountCharge || 0,
-      status: b.status
-    }));
+    const report = bookings.map(b => {
+      const loadingDateTime = getEventDate(b.eventHistory, 'loaded') || b.loadingDate || b.createdAt;
 
-    // Totals
+      return {
+        BookingDate: formatDate(b.bookingDate),
+        LoadingDateTime: formatDateTime(loadingDateTime),
+        BookingId: b.bookingId || '',
+        FromOffice: b.fromOffice?.name || '',
+        ToOffice: b.toOffice?.name || '',
+        VehicleNumber: b.assignedVehicle?.vehicleNumber || '',
+        Quantity: b.quantity || 0,
+        FreightCharge: b.freightCharge || 0,
+        LoadingCharge: b.loadingCharge || 0,
+        UnloadingCharge: b.unloadingCharge || 0,
+        OtherCharge: b.gst || 0,
+        TotalAmountCharge: b.totalAmountCharge || 0,
+        status: b.status
+      };
+    });
+
     const totals = bookings.reduce((acc, r) => {
       acc.Quantity += r.quantity || 0;
       acc.FreightCharge += r.freightCharge || 0;
       acc.LoadingCharge += r.loadingCharge || 0;
       acc.UnloadingCharge += r.unloadingCharge || 0;
-      acc.OtherCharge += r.otherCharge || 0;
+      acc.OtherCharge += r.gst || 0;
       acc.TotalAmountCharge += r.totalAmountCharge || 0;
       return acc;
     }, {
@@ -1473,27 +1277,23 @@ exports.exportIGCLReportExcel = async (req, res) => {
       TotalAmountCharge: 0
     });
 
-    // Push total row
     report.push({
-      VehicleNumber: 'TOTAL',
-      Quantity: '',
       BookingDate: '',
       LoadingDateTime: '',
       BookingId: '',
       FromOffice: '',
       ToOffice: '',
+      VehicleNumber: 'TOTAL',
+      status: '',
       ...totals
     });
 
-    // Create Excel sheet and workbook
     const worksheet = XLSX.utils.json_to_sheet(report);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'IGCL Report');
 
-    // Buffer the workbook
     const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
 
-    // Send Excel file
     res.setHeader('Content-Disposition', `attachment; filename=igcl_report_${date}.xlsx`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.send(buffer);
@@ -1513,10 +1313,6 @@ exports.exportOGCLReportExcel = async (req, res) => {
   const operatorId = requestContext.getOperatorId();
   const userId = req.user?._id;
 
-  if (!date || !operatorId) {
-    return res.status(400).json({ error: 'Date and operatorId are required' });
-  }
-
   try {
     const filter = {
       operatorId,
@@ -1530,6 +1326,11 @@ exports.exportOGCLReportExcel = async (req, res) => {
       .populate('assignedVehicle', 'vehicleNumber')
       .lean();
 
+    const getEventDate = (events, type) => {
+      const e = Array.isArray(events) ? events.find(ev => ev.type === type) : null;
+      return e?.date || '';
+    };
+
     const formatDate = (dt) => {
       if (!dt) return '';
       const d = new Date(dt);
@@ -1542,21 +1343,25 @@ exports.exportOGCLReportExcel = async (req, res) => {
       return `${d.toISOString().split('T')[0]} ${d.toTimeString().split(' ')[0]}`;
     };
 
-    const report = bookings.map(b => ({
-      BookingDate: formatDate(b.bookingDate),
-      LoadingDateTime: formatDateTime(b.loadingDateTime || b.loadingDate),
-      BookingId: b.bookingId,
-      FromOffice: b.fromOffice?.name || '',
-      ToOffice: b.toOffice?.name || '',
-      VehicleNumber: b.assignedVehicle?.vehicleNumber || '',
-      Quantity: b.quantity || 0,
-      FreightCharge: b.freightCharge || 0,
-      LoadingCharge: b.loadingCharge || 0,
-      UnloadingCharge: b.unloadingCharge || 0,
-      OtherCharge: b.otherCharge || 0,
-      TotalAmountCharge: b.totalAmountCharge || 0,
-      status: b.status
-    }));
+    const report = bookings.map(b => {
+      const loadingDateTime = getEventDate(b.eventHistory, 'loaded') || b.loadingDateTime || b.loadingDate || b.createdAt;
+
+      return {
+        BookingDate: formatDate(b.bookingDate),
+        LoadingDateTime: formatDateTime(loadingDateTime),
+        BookingId: b.bookingId || '',
+        FromOffice: b.fromOffice?.name || '',
+        ToOffice: b.toOffice?.name || '',
+        VehicleNumber: b.assignedVehicle?.vehicleNumber || '',
+        Quantity: b.quantity || 0,
+        FreightCharge: b.freightCharge || 0,
+        LoadingCharge: b.loadingCharge || 0,
+        UnloadingCharge: b.unloadingCharge || 0,
+        OtherCharge: b.gst || 0,
+        TotalAmountCharge: b.totalAmountCharge || 0,
+        status: b.status || ''
+      };
+    });
 
     // Totals
     const totals = bookings.reduce((acc, r) => {
@@ -1564,11 +1369,10 @@ exports.exportOGCLReportExcel = async (req, res) => {
       acc.FreightCharge += r.freightCharge || 0;
       acc.LoadingCharge += r.loadingCharge || 0;
       acc.UnloadingCharge += r.unloadingCharge || 0;
-      acc.OtherCharge += r.otherCharge || 0;
+      acc.OtherCharge += r.gst || 0;
       acc.TotalAmountCharge += r.totalAmountCharge || 0;
       return acc;
     }, {
-      vehicleNumber: 'Total',
       Quantity: 0,
       FreightCharge: 0,
       LoadingCharge: 0,
@@ -1577,25 +1381,29 @@ exports.exportOGCLReportExcel = async (req, res) => {
       TotalAmountCharge: 0
     });
 
-    // Push total row
+    // Add total row
     report.push({
       BookingDate: '',
       LoadingDateTime: '',
       BookingId: '',
       FromOffice: '',
       ToOffice: '',
-      ...totals
+      VehicleNumber: 'TOTAL',
+      Quantity: totals.Quantity,
+      FreightCharge: totals.FreightCharge,
+      LoadingCharge: totals.LoadingCharge,
+      UnloadingCharge: totals.UnloadingCharge,
+      OtherCharge: totals.OtherCharge,
+      TotalAmountCharge: totals.TotalAmountCharge,
+      status: ''
     });
 
-    // Create Excel sheet and workbook
     const worksheet = XLSX.utils.json_to_sheet(report);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'OGCL Report');
 
-    // Buffer the workbook
     const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
 
-    // Send Excel file
     res.setHeader('Content-Disposition', `attachment; filename=ogcl_report_${date}.xlsx`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.send(buffer);

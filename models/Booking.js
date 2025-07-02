@@ -1,22 +1,20 @@
 const mongoose = require('mongoose');
 
-const assignedVehicleHistorySchema = new mongoose.Schema({
-  vehicle: { type: mongoose.Schema.Types.ObjectId, ref: 'Vehicle', required: true },
-  assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  assignedAt: { type: Date, default: Date.now }
-}, { _id: false });
-
-
 const bookingSchema = new mongoose.Schema({
   bookingId: { type: String },
   bookingDate: { type: String, index: true },
 
-  // Users and operator
-  bookedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  loadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-  unloadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-  deliveredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-  cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  bookedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  eventHistory: [{
+    type: {
+      type: String,
+      enum: ['loaded', 'unloaded', 'delivered', 'cancelled'],
+    },
+    date: { type: Date, default: Date.now },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    vehicle: { type: mongoose.Schema.Types.ObjectId, ref: 'Vehicle', default: null },
+    branch: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null }
+  }],
   operatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Operator', required: true },
 
   // Sender info
@@ -48,14 +46,13 @@ const bookingSchema = new mongoose.Schema({
   dimensions: String,
 
   // Vehicle assignment
-  assignedVehicle: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Vehicle',
-    default: null
-  },
-
-    assignedVehicleHistory: [assignedVehicleHistorySchema],
-
+  assignedVehicle: 
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vehicle',
+      default: null
+    },
+  
 
   // Status
   status: {
@@ -64,11 +61,23 @@ const bookingSchema = new mongoose.Schema({
     default: 'Pending',
   },
 
+  deliveryType: {
+  type: String,
+  enum: ['Door Delivery'],
+  default: undefined,     
+  required: false,       
+},
+
+
+getpackage: {
+  type: String,
+},
+
   // Charges
   freightCharge: { type: Number, default: 0 },
   loadingCharge: { type: Number, default: 0 },
   unloadingCharge: { type: Number, default: 0 },
-  otherCharge: { type: Number, default: 0 },
+  gst: { type: Number, default: 0 },
   totalAmountCharge: { type: Number, default: 0 },
 
 

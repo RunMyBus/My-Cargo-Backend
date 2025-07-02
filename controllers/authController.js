@@ -46,7 +46,9 @@ exports.login = async (req, res) => {
 
   try {
 
-    const user = await User.findOne({ mobile }).populate('role', 'rolename');
+    const user = await User.findOne({ mobile })
+    .populate('role', 'rolename')
+    .populate('branchId', 'name');
     if (!user) {
       return res.status(400).json({ message: 'Mobile number not found' });
     }
@@ -84,7 +86,7 @@ exports.login = async (req, res) => {
       token: token,
       role: user.role?.rolename  || null,
       operatorId: user.operatorId,
-      branchId: user.branchId,
+      branch: user.branchId ? { id: user.branchId._id, name: user.branchId.name } : null,
       paymentOptions,
       message: 'LOGGED_IN_SUCCESSFULLY'
     });

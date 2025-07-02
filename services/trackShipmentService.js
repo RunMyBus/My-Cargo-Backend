@@ -60,7 +60,10 @@ class TrackShipmentService {
     }
 
     const booking = await Booking.findOne({ bookingId })
-      .populate('bookedBy loadedBy unloadedBy deliveredBy cancelledBy', 'fullName')
+      .populate('bookedBy', 'fullName')
+      .populate('eventHistory.user', 'fullName')
+      .populate('eventHistory.vehicle', 'vehicleNumber')
+      .populate('eventHistory.branch', 'name')
       .populate('fromOffice toOffice', 'name')
       .populate('assignedVehicle', 'vehicleNumber');
 
@@ -73,49 +76,29 @@ class TrackShipmentService {
     const tracking = [];
 
     const getName = (user) => user?.fullName || 'Unknown';
-    const getBranch = (office) => office?.name || 'Unknown';
+    const getBranch = (branch) => branch?.name || 'Unknown';
     const getVehicle = (vehicle) => vehicle?.vehicleNumber || 'N/A';
 
-    // Booked
+    // Always add Booked status (from bookedBy and bookingDate)
     tracking.push({
-      bookingStatus: 'Booked',
-      bookingDate: this.formatDate(booking.createdAt),
-      bookingInfo: `booked by ${getName(booking.bookedBy)} at ${getBranch(booking.fromOffice)}`
+      status: 'Booked',
+      date: this.formatDate(booking.createdAt),
+      info: `booked by ${getName(booking.bookedBy)} at ${getBranch(booking.fromOffice)}`
     });
 
-    // Loaded
-    if (booking.loadedBy) {
-      tracking.push({
-        loadingStatus: 'Loaded',
-        loadingDate: this.formatDate(booking.updatedAt),
-        loadingInfo: `loaded by ${getName(booking.loadedBy)} at ${getBranch(booking.fromOffice)} to vehicle ${getVehicle(booking.assignedVehicle)}`
-      });
-    }
+    // Loop over eventHistory for other events
+    for (const event of booking.eventHistory) {
+      // Capitalize first letter of type
+      const statusCapitalized = event.type.charAt(0).toUpperCase() + event.type.slice(1);
 
-    // Unloaded
-    if (booking.unloadedBy) {
-      tracking.push({
-        unloadingStatus: 'Unloaded',
-        unloadingDate: this.formatDate(booking.updatedAt),
-        unloadingInfo: `unloaded by ${getName(booking.unloadedBy)} at ${getBranch(booking.toOffice)}`
-      });
-    }
+      let info = `${statusCapitalized} by ${getName(event.user)}`;
+      if (event.branch) info += ` at ${getBranch(event.branch)}`;
+      if (event.vehicle) info += ` using vehicle ${getVehicle(event.vehicle)}`;
 
-    // Delivered
-    if (booking.deliveredBy) {
       tracking.push({
-        deliveryStatus: 'Delivered',
-        deliveryDate: this.formatDate(booking.updatedAt),
-        deliveryInfo: `delivered by ${getName(booking.deliveredBy)} at ${getBranch(booking.toOffice)}`
-      });
-    }
-
-    // Cancelled
-    if (booking.cancelledBy) {
-      tracking.push({
-        cancelStatus: 'Cancelled',
-        cancelDate: this.formatDate(booking.updatedAt),
-        cancelInfo: `cancelled by ${getName(booking.cancelledBy)}`
+        status: statusCapitalized,
+        date: this.formatDate(event.date),
+        info,
       });
     }
 
@@ -123,7 +106,7 @@ class TrackShipmentService {
       bookingId: booking.bookingId,
       bookedDate: this.formatOnlyDate(booking.bookingDate),
       totalAmount: booking.totalAmountCharge?.toString() || '',
-      reciverName: booking.receiverName || '',
+      receiverName: booking.receiverName || '',
       tracking
     };
   }

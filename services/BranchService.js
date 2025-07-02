@@ -11,7 +11,7 @@ class BranchService {
     try {
       const branch = new Branch({
         ...branchData,
-        status: branchData.status?.toLowerCase() || 'Active'
+        status: branchData.status || 'Active'
       });
 
       await branch.save();
