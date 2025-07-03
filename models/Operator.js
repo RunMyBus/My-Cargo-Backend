@@ -6,7 +6,7 @@ const operatorSchema = new mongoose.Schema({
     type: String, 
     required: true,
     unique: true,
-    uppercase: true,     // automatically convert to uppercase on save
+    uppercase: true,     
     minlength: 3,
     maxlength: 3,
     validate: {

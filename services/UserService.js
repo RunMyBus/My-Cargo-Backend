@@ -34,22 +34,41 @@ class UserService {
    * @param {string} id - User ID
    * @returns {Promise<Object>} User details
    */
-  static async getUserById(id) {
-    logger.info('Fetching user by ID', { userId: id });
-    
-    try {
-      const user = await User.findById(id).populate('role');
-      if (!user) {
-        logger.warn('User not found', { userId: id });
-        throw new Error('User not found');
-      }
-      logger.debug('Successfully fetched user', { userId: id, role: user.role?.name });
-      return user;
-    } catch (error) {
-      logger.error('Error fetching user by ID', { error: error.message, userId: id, stack: error.stack });
-      throw error;
+ static async getUserById(id) {
+  logger.info('Fetching user by ID', { userId: id });
+
+  try {
+    const user = await User.findById(id)
+      .populate('role')
+      .populate('branchId', 'name')       
+      .populate('operatorId', 'name');    
+
+    if (!user) {
+      logger.warn('User not found', { userId: id });
+      throw new Error('User not found');
     }
+
+    logger.debug('Successfully fetched user', {
+      userId: id,
+      role: user.role?.name,
+      branch: user.branchId?.name,
+      operator: user.operatorId?.name,
+    });
+
+    return {
+      ...user.toObject(),
+      branchName: user.branchId?.name || null,
+      operatorName: user.operatorId?.name || null,
+    };
+  } catch (error) {
+    logger.error('Error fetching user by ID', {
+      error: error.message,
+      userId: id,
+      stack: error.stack,
+    });
+    throw error;
   }
+}
 
   /**
    * Create a new user
