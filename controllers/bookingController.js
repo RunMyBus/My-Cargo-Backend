@@ -7,13 +7,13 @@ const ExportService = require('../services/ExportService');
 
 
 // Create booking
-exports.intiateBooking = async (req, res) => {
+exports.initiateBooking = async (req, res) => {
   try {
     const operatorId = requestContext.getOperatorId();
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
-    const booking = await BookingService.intiateBooking(req.body, req.user._id, operatorId);
+    const booking = await BookingService.initiateBooking(req.body, req.user._id, operatorId);
     res.status(201).json(booking);
   } catch (error) {
     logger.error('Error creating booking in controller', { error: error.message });
@@ -216,7 +216,6 @@ exports.getArrivedBookings = async (req, res) => {
 };
 
 // Search bookings with pagination
-// Search bookings with pagination
 exports.searchBookings = async (req, res) => {
   try {
     const { limit = 10, page = 1, query = "", status = "" } = req.body;
@@ -248,11 +247,11 @@ exports.exportBookings = async (req, res) => {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
 
-    const csv = await ExportService.exportBookings(operatorId);
+    const buffer = await ExportService.exportBookings(operatorId);
 
-    res.header('Content-Type', 'text/csv');
-    res.attachment(`bookings-${Date.now()}.csv`);
-    res.send(csv);
+    res.setHeader('Content-Disposition', `attachment; filename=bookings_${Date.now()}.xlsx`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
   } catch (error) {
     logger.error('Error exporting bookings', { error: error.message });
     res.status(500).json({ error: 'Failed to export bookings' });
@@ -267,12 +266,11 @@ exports.exportUnassignedBookings = async (req, res) => {
     }
 
     const query = req.query?.query || '';
+    const buffer = await ExportService.exportUnassignedBookings(operatorId, query);
 
-    const csv = await ExportService.exportUnassignedBookings(operatorId, query);
-
-    res.header('Content-Type', 'text/csv');
-    res.attachment(`unassigned_bookings_${Date.now()}.csv`);
-    res.send(csv);
+    res.setHeader('Content-Disposition', `attachment; filename=unassigned_bookings_${Date.now()}.xlsx`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
   } catch (error) {
     if (error.message === 'No unassigned bookings found to export') {
       return res.status(404).json({ message: error.message });
@@ -295,12 +293,11 @@ exports.exportArrivedBookings = async (req, res) => {
     }
 
     const query = req.body?.query || '';
+    const buffer = await ExportService.exportArrivedBookings(operatorId, query);
 
-    const csv = await ExportService.exportArrivedBookings(operatorId, query);
-
-    res.header('Content-Type', 'text/csv');
-    res.attachment(`arrived_bookings_${Date.now()}.csv`);
-    res.send(csv);
+    res.setHeader('Content-Disposition', `attachment; filename=arrived_bookings_${Date.now()}.xlsx`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
   } catch (error) {
     if (error.message === 'No arrived bookings found to export') {
       return res.status(404).json({ message: error.message });
@@ -323,12 +320,11 @@ exports.exportInTransitBookings = async (req, res) => {
     }
 
     const query = req.body?.query || '';
+    const buffer = await ExportService.exportInTransitBookings(operatorId, query);
 
-    const csv = await ExportService.exportInTransitBookings(operatorId, query);
-
-    res.header('Content-Type', 'text/csv');
-    res.attachment(`in_transit_bookings_${Date.now()}.csv`);
-    res.send(csv);
+    res.setHeader('Content-Disposition', `attachment; filename=in_transit_bookings_${Date.now()}.xlsx`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
   } catch (error) {
     if (error.message === 'No in transit bookings found to export') {
       return res.status(404).json({ message: error.message });
@@ -367,3 +363,28 @@ exports.markAsDelivered = async (req, res) => {
     res.status(500).json({ error: error.message || 'Failed to mark as delivered' });
   }
 };
+
+exports.getContactByPhone = async (req, res) => {
+  try {
+    const operatorId = requestContext.getOperatorId();
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+    
+    const phone = req.params.phone;
+    if (!phone) {
+      return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    const contact = await BookingService.getContactByPhone(operatorId, phone);
+    if (!contact) {
+      return res.status(404).json({ message: 'Contact not found' });
+    }
+
+    res.json(contact);
+  } catch (error) {
+    logger.error('Error getting contact by phone', { error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+

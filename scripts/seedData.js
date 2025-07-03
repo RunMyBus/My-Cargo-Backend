@@ -77,7 +77,7 @@ const clearData = async () => {
 const seedData = async () => {
   try {
     await connectDB();
-    await clearData();
+    // await clearData();
 
     console.log('Seeding data...');
 

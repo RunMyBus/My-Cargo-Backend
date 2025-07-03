@@ -8,7 +8,7 @@ const Operator = require('../models/Operator');
 const Transaction = require('../models/Transaction');
 
 class BookingService {
-  static async intiateBooking(data, userId, operatorId) {
+  static async initiateBooking(data, userId, operatorId) {
     try {
       logger.info('Booking creation request received', {
         userId,
@@ -156,7 +156,7 @@ class BookingService {
       }
 
       const result = booking.toObject();
-      result.senderName = booking.assignedVehicle?.vehicleNumber || "Assign vehicleNumber";
+      result.senderName = result.senderName || result.fromOffice.name;
       return result;
     } catch (error) {
       logger.error('Error getting booking by ID', {
@@ -200,6 +200,16 @@ class BookingService {
         booking.bookedBy = userId;
       }
 
+      if (
+      booking.status === 'Delivered' && !booking.eventHistory.some(e => e.type === 'delivered')) {
+        booking.eventHistory.push({
+          type: 'delivered',
+          user: userId,
+          date: new Date(),
+          vehicle: booking.assignedVehicle || null,
+          branch: null, // optional: add branch if you want
+        });
+      }
       await booking.save(); // Persist updated booking
 
       // Only update cargo balance for 'Paid' bookings
@@ -277,7 +287,6 @@ class BookingService {
       const statusToEventMap = {
         InTransit: 'loaded',
         Arrived: 'unloaded',
-        Delivered: 'delivered',
         Cancelled: 'cancelled'
       };
 
@@ -289,11 +298,11 @@ class BookingService {
           user: currentUserId,
           date: now,
           vehicle: updateData.assignedVehicle || booking.assignedVehicle || null,
-          branch: user.branchId  // use current user's branch here
+          branch: user.branchId
         });
       }
 
-      // If assigning vehicle for the first time or changing it
+      // Update assignedVehicle if changed or newly assigned
       if (
         updateData.assignedVehicle &&
         (!booking.assignedVehicle || booking.assignedVehicle.toString() !== updateData.assignedVehicle)
@@ -301,7 +310,7 @@ class BookingService {
         booking.assignedVehicle = updateData.assignedVehicle;
       }
 
-      // Apply other updates
+      // Apply other updates from updateData
       Object.assign(booking, updateData);
       booking.updatedAt = now;
 
@@ -840,6 +849,56 @@ class BookingService {
         bookingId: booking._id,
         userId,
         stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  static async getContactByPhone(operatorId, phoneNumber) {
+    logger.info('Fetching contact by phone', { operatorId, phoneNumber });
+
+    try {
+      // Search bookings for sender or receiver matching the phoneNumber under operatorId
+      const booking = await Booking.findOne({
+        operatorId,
+        $or: [
+          { senderPhone: phoneNumber },
+          { receiverPhone: phoneNumber }
+        ]
+      });
+
+      if (!booking) {
+        return null;
+      }
+
+      // Determine if phone matches sender or receiver and prepare result accordingly
+      let contact = null;
+
+      if (booking.senderPhone === phoneNumber) {
+        contact = {
+          name: booking.senderName,
+          email: booking.senderEmail || '',   // if available
+          address: booking.senderAddress || '',
+          phone: booking.senderPhone
+        };
+      } else if (booking.receiverPhone === phoneNumber) {
+        contact = {
+          name: booking.receiverName,
+          email: booking.receiverEmail || '',  // if available
+          address: booking.receiverAddress || '',
+          phone: booking.receiverPhone
+        };
+      }
+
+      logger.info('Contact fetched successfully', { contact });
+
+      return contact;
+    } catch (error) {
+      logger.error('Error fetching contact by phone', {
+        error: error.message,
+        operatorId,
+        phoneNumber,
+        stack: error.stack,
       });
       throw error;
     }

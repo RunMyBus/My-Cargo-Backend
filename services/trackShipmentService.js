@@ -35,6 +35,7 @@ class TrackShipmentService {
         bookingDate: b.bookingDate,
         senderName: b.senderName,
         receiverName: b.receiverName,
+        toOffice: b.toOffice,
         status: b.status,
       }));
     } catch (error) {
@@ -99,6 +100,15 @@ class TrackShipmentService {
         status: statusCapitalized,
         date: this.formatDate(event.date),
         info,
+      });
+    }
+
+    // Add Delivered event manually if booking.status = Delivered but no delivered event in eventHistory
+    if (booking.status === 'Delivered' && !booking.eventHistory.some(e => e.type === 'delivered')) {
+      tracking.push({
+        status: 'Delivered',
+        date: this.formatDate(booking.updatedAt),
+        info: `Delivered by ${getName(booking.bookedBy)} at ${getBranch(booking.toOffice)}`
       });
     }
 
