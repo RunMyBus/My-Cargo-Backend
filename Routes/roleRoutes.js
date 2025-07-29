@@ -12,6 +12,5 @@ router.get('/search', roleController.searchRoles);   // Search
 router.get('/:id', roleController.getRoleById);       // Read One
 router.put('/:id', roleController.updateRole);        // Update
 router.delete('/:id', roleController.deleteRole);     // Delete
-router.get('/search', roleController.searchRoles);   // Search
 
 module.exports = router;
