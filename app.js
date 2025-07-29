@@ -21,10 +21,17 @@ app.use((req, res, next) => {
 // Request context middleware — must be after passport middleware!
 app.use(requestContext.middleware());
 
-// Error handling middleware (should be after all other middlewares and routes)
-app.use((err, req, res, next) => {
-    logger.error(err.stack);
-    res.status(500).json({ error: 'Something went wrong!' });
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err, promise) => {
+    logger.error('Unhandled Rejection at:', promise, 'reason:', err);
+    // Close server & exit process
+    process.exit(1);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+    logger.error('Uncaught Exception thrown:', err);
+    process.exit(1);
 });
 
 // Start the server only if not in test mode

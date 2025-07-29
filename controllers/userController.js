@@ -1,36 +1,49 @@
 const UserService = require('../services/UserService');
 const logger = require('../utils/logger');
 const requestContext = require('../utils/requestContext');
+const catchAsync = require('../utils/catchAsync');
+const AppError = require('../utils/AppError');
 
 /**
  * Get all users for the current operator
  */
-exports.getUsers = async (req, res) => {
-  try {
-    const operatorId = req.user?.operatorId;
-    const users = await UserService.getUsers(operatorId);
-    res.status(200).json(users);
-  } catch (error) {
-    logger.error('Error in getUsers controller', { error: error.message });
-    res.status(500).json({ message: 'Failed to fetch users' });
+exports.getUsers = catchAsync(async (req, res) => {
+  const operatorId = req.user?.operatorId;
+  
+  if (!operatorId) {
+    throw new AppError('Operator ID not found in user context', 400, 'MISSING_OPERATOR_ID');
   }
-};
+
+  const users = await UserService.getUsers(operatorId);
+  
+  res.status(200).json({
+    success: true,
+    status: 'success',
+    data: {
+      users,
+      count: users.length
+    }
+  });
+});
 
 /**
  * Get user by ID
  */
-exports.getUserById = async (req, res) => {
-  try {
-    const user = await UserService.getUserById(req.params.id);
-    res.status(200).json(user);
-  } catch (error) {
-    if (error.message === 'User not found') {
-      return res.status(404).json({ message: error.message });
-    }
-    logger.error('Error in getUserById controller', { error: error.message });
-    res.status(500).json({ message: 'Failed to fetch user' });
+exports.getUserById = catchAsync(async (req, res) => {
+  const user = await UserService.getUserById(req.params.id);
+  
+  if (!user) {
+    throw new AppError('User not found', 404, 'USER_NOT_FOUND');
   }
-};
+
+  res.status(200).json({
+    success: true,
+    status: 'success',
+    data: {
+      user
+    }
+  });
+});
 
 /**
  * Create a new user

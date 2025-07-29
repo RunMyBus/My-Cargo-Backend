@@ -2,46 +2,58 @@ const express = require('express');
 const app = express();
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const createError = require('http-errors');
 const path = require('path');
 const routes = require('../Routes/index.js')  
 const passport = require('../middleware/passport');
 const session = require('express-session');
+const AppError = require('../utils/AppError');
+const globalErrorHandler = require('../middleware/errorHandler');
+const { 
+  helmetConfig, 
+  sanitizeInput, 
+  generalLimiter,
+  validateCORS 
+} = require('../middleware/security');
 
 app.use(session({
-    secret: 'My Cargo',
+    secret: process.env.SESSION_SECRET || 'change-this-secret-in-production',
     resave: false,
-    saveUninitialized: false
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
   }));
   
 
 
+// Security middleware
+app.use(helmetConfig);
+app.use(generalLimiter);
+app.use(sanitizeInput);
+
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
-// app.use(cookieParser());
-// app.use(compress());
-// app.use(methodOverride());
-
-// Define allowed ports
-const allowedOrigins = [
-    'http://localhost:8080',
-    'https://packkme.com',
-];
-
+// Define allowed origins from environment
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:8080,https://packkme.com').split(',');
 
 // Configure CORS
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true); // Allow the request
+            callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS')); 
+            callback(new AppError('Not allowed by CORS', 403, 'CORS_VIOLATION'));
         }
-    }
+    },
+    credentials: true,
+    optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
+app.use(validateCORS);
 
  // Initialize Passport and restore authentication state from session
  app.use(passport.initialize());
@@ -56,17 +68,12 @@ app.use(cors(corsOptions));
 
 
 // catch 404 and forward to error handler
-app.use((req, res, next) => {
-    next(createError(404, "Not Found"));
+app.use('*', (req, res, next) => {
+    next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404, 'ROUTE_NOT_FOUND'));
 });
 
-
-// Error handler middleware
-app.use((err, req, res, next) => {
-    res.status(err.status || 500).json({
-        message: err.message || "Internal Server Error",
-    });
-});
+// Global error handling middleware
+app.use(globalErrorHandler);
 
 
 
