@@ -285,6 +285,50 @@ class UserService {
   }
 
   /**
+   * Add amount to user's cargo balance
+   * @param {string} userId - User ID
+   * @param {number} amount - Amount to add to cargo balance
+   * @returns {Promise<Object>} Updated user with new balance
+   */
+  static async addToCargoBalance(userId, amount) {
+    logger.info('Adding amount to cargo balance', { userId, amount });
+    
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        logger.warn('User not found for cargo balance update', { userId });
+        throw new Error('User not found');
+      }
+
+      const oldBalance = user.cargoBalance || 0;
+      const newBalance = oldBalance + amount;
+      
+      const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { cargoBalance: newBalance },
+        { new: true }
+      );
+
+      logger.info('Cargo balance updated successfully', {
+        userId,
+        amount,
+        oldBalance,
+        newBalance
+      });
+
+      return updatedUser;
+    } catch (error) {
+      logger.error('Error adding to cargo balance', {
+        error: error.message,
+        userId,
+        amount,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Get today's cargo balance for a user
    * @param {string} userId - User ID
    * @returns {Promise<Object>} Cargo balance

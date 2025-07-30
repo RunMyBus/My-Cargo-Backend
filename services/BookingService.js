@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const { request } = require('express');
 const Operator = require('../models/Operator');
 const Transaction = require('../models/Transaction');
+const UserService = require('./UserService');
 
 class BookingService {
   static async initiateBooking(data, userId, operatorId) {
@@ -215,14 +216,13 @@ class BookingService {
       // Only update cargo balance for 'Paid' bookings
       if (booking.lrType === 'Paid') {
         const amount = booking.totalAmountCharge || 0;
-        user.cargoBalance = (user.cargoBalance || 0) + amount;
-        await user.save();
+        const updatedUser = await UserService.addToCargoBalance(userId, amount);
 
         // Create a transaction record
         await Transaction.create({
           user: userId,
           amount,
-          balanceAfter: user.cargoBalance,
+          balanceAfter: updatedUser.cargoBalance,
           type: 'Booking',
           referenceId: booking._id,
           description: 'Cargo balance updated from Paid booking'
@@ -232,7 +232,7 @@ class BookingService {
           bookingId: booking._id,
           userId,
           amount,
-          newBalance: user.cargoBalance
+          newBalance: updatedUser.cargoBalance
         });
       } else {
         logger.info('ToPay booking — cargo balance not updated', {
@@ -815,21 +815,24 @@ class BookingService {
       if (updateData.paymentType) booking.paymentType = updateData.paymentType;
       booking.deliveredBy = userId;
 
+      let finalUser = user;
       // If paymentType is 'cash', update cargo balance
-      if (updateData.paymentType?.toLowerCase() === 'cash') {
-        const amount = booking.totalAmountCharge || 0;
-        user.cargoBalance = (user.cargoBalance || 0) + amount;
+      if(booking.lrType === 'ToPay') {
+        if (updateData.paymentType?.toLowerCase() === 'cash') {
+          const amount = booking.totalAmountCharge || 0;
+          finalUser = await UserService.addToCargoBalance(userId, amount);
 
-        await Transaction.create({
-          user: userId,
-          amount: amount,
-          balanceAfter: user.cargoBalance,
-          type: 'Delivered',
-          referenceId: booking._id,
-          description: 'Cargo balance updated from delivery (cash payment)'
-        });
-
-        await user.save();
+          await Transaction.create({
+            user: userId,
+            amount: amount,
+            balanceAfter: finalUser.cargoBalance,
+            type: 'Delivered',
+            referenceId: booking._id,
+            description: 'Cargo balance updated from delivery (cash payment)'
+          });
+        } else {
+          //TODO: handle the UPI payment
+        }
       }
 
       await booking.save();
@@ -840,7 +843,7 @@ class BookingService {
         paymentType: updateData.paymentType,
         status: updateData.status,
         amount: booking.totalAmountCharge,
-        updatedBalance: user.cargoBalance
+        updatedBalance: finalUser.cargoBalance
       });
 
     } catch (error) {
