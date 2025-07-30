@@ -68,7 +68,7 @@ app.use(validateCORS);
 
 
 // catch 404 and forward to error handler
-app.use('*', (req, res, next) => {
+app.use('/{*any}', (req, res, next) => {
     next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404, 'ROUTE_NOT_FOUND'));
 });
 

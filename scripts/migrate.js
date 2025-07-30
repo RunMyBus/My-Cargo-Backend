@@ -18,7 +18,7 @@ async function runMigrations() {
     const runner = new MigrationRunner();
     
     // Add all migrations
-    runner.addMigration(migration001);
+    runner.addMigration(  );
     runner.addMigration(migration002);
     
     // Get command line arguments

@@ -37,6 +37,7 @@ const connectDB = async () => {
     } else {
       mongoUrl = 'mongodb://' + config.DB_HOST + ':' + config.DB_PORT + '/' + config.DB_NAME;
     }
+    //mongoUrl = "mongodb://localhost/MyCargo";
     console.log('MongoDB URL:', mongoUrl);
     await mongoose.connect(mongoUrl, {
       useNewUrlParser: true,

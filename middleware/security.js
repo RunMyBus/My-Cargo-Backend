@@ -5,8 +5,8 @@ const AppError = require('../utils/AppError');
 // Rate limiting configuration
 const createRateLimiter = (options = {}) => {
   const defaultOptions = {
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60 * 1000, // 1 minute
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 500,
     message: {
       success: false,
       status: 'error',
@@ -46,7 +46,7 @@ const authLimiter = createRateLimiter({
 });
 
 const apiLimiter = createRateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 60 * 1000, // 1 minute
   max: 1000, // Higher limit for authenticated API calls
 });
 
