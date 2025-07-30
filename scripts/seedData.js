@@ -5,7 +5,7 @@ const { faker } = require('@faker-js/faker/locale/en_IN');
 const moment = require('moment');
 
 // Load environment variables
-require('dotenv').config();
+require('dotenv').config({ path: '../.env' });
 const config = process.env;
 
 // Set Faker locale for Indian names and addresses
@@ -62,7 +62,7 @@ const clearData = async () => {
   await Vehicle.deleteMany({});
   await User.deleteMany({
     $or: [
-      { mobile: { $lt: "9999999990" } },
+      { mobile: { $lt: "9999999992" } },
       { mobile: { $gt: "9999999999" } }
     ]
   });
@@ -77,7 +77,7 @@ const clearData = async () => {
 const seedData = async () => {
   try {
     await connectDB();
-    // await clearData();
+    await clearData();
 
     console.log('Seeding data...');
 
@@ -137,6 +137,11 @@ const seedData = async () => {
     const allRoles = [];
     const roleTemplates = [
       {
+        rolename: 'Super User',
+        description: 'System administrator with full access',
+        permissions: createdPermissions.map(p => p._id)
+      },
+      {
         rolename: 'Admin',
         description: 'Administrator with full access',
         permissions: createdPermissions.map(p => p._id)
@@ -167,13 +172,45 @@ const seedData = async () => {
     // Get all permissions
     const allPermissions = await Permission.find({});
 
+    let superUserRole;
+
+    // Create Super User account
+    // Create user with mobile 9999999991 before other users
+    const superUser = await User.create({
+      fullName: 'Super User',
+      email: 'admin@mycargo.com',
+      mobile: '9999999991',
+      password: await hashPassword('123456'),
+      role: null, // Will be assigned after role creation
+      operatorId: operators[0]._id, // Assign to first operator
+      branchId: null, // Will be assigned to first branch
+      status: 'Active',
+      createdBy: null
+    });
+    console.log('Created Super User account');
+
+    // Create Super User role
+    superUserRole = await Role.create({
+      rolename: 'Super User',
+      description: 'System administrator with full access',
+      permissions: createdPermissions.map(p => p._id),
+      operatorId: operators[0]._id,
+      createdBy: superUser._id
+    });
+    allRoles.push(superUserRole);
+    // Update the super user's role
+    await User.findByIdAndUpdate(superUser._id, { role: superUserRole._id });
+    console.log('Assigned Super User role to user with mobile 9999999991');
+
+    // Create other roles for all operators
     for (const operator of operators) {
-      for (const template of roleTemplates) {
+      for (const template of roleTemplates.filter(t => t.rolename !== 'Super User')) {
         const role = await Role.create({
           rolename: template.rolename,
           description: template.description,
-          permissions: allPermissions.map(p => p._id), // Assign all permissions for now
-          operatorId: operator._id
+          permissions: createdPermissions.map(p => p._id),
+          operatorId: operator._id,
+          createdBy: superUser._id
         });
         allRoles.push(role);
       }
@@ -209,6 +246,10 @@ const seedData = async () => {
       }
     }
     console.log(`Total branches created: ${allBranches.length}`);
+
+    // Update the super user's branch
+    await User.findByIdAndUpdate(superUser._id, { branchId: allBranches[0]._id });
+    console.log('Assigned branch to Super User');
 
     // 5. Create Users for each branch
     const allUsers = [];
@@ -523,7 +564,7 @@ const seedData = async () => {
         
         // Create the booking object
         // Generate booking ID with sequence
-        const bookingId = `${operator.code}-${sequence.toString().padStart(6, '0')}`;
+        const bookingId = `${lrType === 'Paid' ? 'P' : 'TP'}-${operator.code}-${sequence.toString().padStart(6, '0')}`;
         
         // Update branch LR type statistics
         branchStats[lrType.toLowerCase()]++;
