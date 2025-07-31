@@ -12,4 +12,16 @@ router.post('/login', authLimiter, validate(loginSchema), passport.authenticate(
     await authController.login(req, res);
 });
 
+router.post('/loginWithOTP', async (req, res, next) => {
+    try {
+        await authController.loginWithOTP(req, res);
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/verifyOTP', passport.authenticate('local', {session: true}), async (req, res) => {
+    await authController.verifyOTP(req, res);
+});
+
 module.exports = router;

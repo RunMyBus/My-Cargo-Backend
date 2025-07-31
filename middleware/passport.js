@@ -4,13 +4,14 @@ const JwtStrategy = require('passport-jwt').Strategy;
 const ExtractJwt = require('passport-jwt').ExtractJwt;
 const bcrypt = require('bcryptjs');
 const User = require('../models/User'); 
+const UserLoginSMSModel = require('../models/UserLoginSMS');
 require('dotenv').config();
 
 const requestContext = require('../utils/requestContext');
 
 const localLogin = new LocalStrategy(
-    { usernameField: 'mobile', passwordField: 'password', passReqToCallback: true },
-    async (req, mobile, password, done) => {
+    { usernameField: 'mobile', passwordField: 'otp', passReqToCallback: true },
+    async (req, mobile, otp, done) => {
       try {
         const user = await User.findOne({ mobile });
   
@@ -20,15 +21,23 @@ const localLogin = new LocalStrategy(
           error.field = 'mobile';
           return done(error);
         }
+        console.log('user', user);
+
+        console.log('mobile', mobile);
+        console.log('otp', otp);
   
-        const isMatch = await bcrypt.compare(password, user.password);
-  
-        if (!isMatch) {
-          const error = new Error('Invalid password');
-          error.status = 400;
-          error.field = 'password';
-          return done(error);
+        const otpRecord = await UserLoginSMSModel.findOne({ mobile: mobile, otp: otp , active: true });
+        logger.info('OTP Record:', otpRecord);
+        if (!otpRecord)
+            return done({status: 400, message: 'INVALID OTP'});
+        
+        if (new Date() > otpRecord.expiryTime) {
+          otpRecord.active = false;
+          await otpRecord.save();
+          return done( {status: 400, message: 'OTP EXPIRED'});
         }
+        otpRecord.active = false;
+        await otpRecord.save();
 
         // Set operatorId in request context
         const context = requestContext.get();
@@ -49,19 +58,13 @@ const opts = {
 };
 
 const jwtLogin = new JwtStrategy(
-    { ...opts, passReqToCallback: true },
-    async (req, jwtPayload, done) => {
+    { ...opts },
+    async (jwtPayload, done) => {
       try {
         const user = await User.findOne({ _id: jwtPayload._id });
-  
+
         if (!user) {
           return done(null, false, { message: 'User not found' });
-        }
-
-        const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
-  
-        if (user.token !== token) {
-          return done(null, false, { message: 'Token mismatch' });
         }
 
         // Set operatorId in request context
@@ -71,7 +74,7 @@ const jwtLogin = new JwtStrategy(
           return done(null, user);
         });
       } catch (err) {
-        return done(err, false, { message: 'Internal server error while verifying token' });
+        return done(err, false, { message: 'Invalid token' });
       }
     }
   );
