@@ -3,6 +3,12 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const logger = require('../utils/logger');
 const Operator = require('../models/Operator');
+const smsService = require('../services/SMSService');
+const config = process.env;
+const axios = require('axios');
+
+const baseUrl = config.WHATSAPP_MESSAGE_URL;
+const apiToken = config.WHATSAPP_API_TOKEN;
 
 // Register Controller
 exports.register = async (req, res) => {
@@ -95,3 +101,110 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+exports.loginWithOTP = async (req, res) => {
+  const { mobile } = req.body;
+
+  if (!mobile) return res({status: 500, error: 'Mobile number is required' });
+
+  let user = await User.findOne({ mobile });
+
+  logger.info('User found:', user);
+    
+    if (!user) {
+      return res.status(400).json({ message: 'Mobile number not found' });
+    } else if (user && user.status.toLowerCase() === 'inactive') {
+      return res.status(400).json({ message: 'User is inactive'});
+    }
+
+  try {
+      const { OTP, isStatic } = await smsService.validateAndCreateOTP(mobile);
+
+      if (!isStatic) {
+          // Sending OTP via SMS
+          const requestBody = {
+            "message": [
+                {
+                    "recipient_whatsapp": `91${mobile}`,
+                    "message_type": "media_template",
+                    "recipient_type": "individual",
+                    "type_media_template": {
+                        "type": "text",
+                        "button": [
+                            {
+                                "index": "0",
+                                "payload": OTP
+                            }
+                        ]
+                    },
+                    "type_template": [
+                        {
+                            "name": "otp_netcore",
+                            "attributes": [
+                                OTP
+                            ],
+                            "language": {
+                                "locale": "en",
+                                "policy": "deterministic"
+                            }
+                        }
+                    ]
+                }
+            ]
+        };
+
+        const response = await axios.post(`${baseUrl}`, requestBody, {
+          headers: {
+            Authorization: `Bearer ${apiToken}`,
+            'Content-Type': 'application/json'
+          }
+        });  
+        console.log("SMS Response:", response.data);
+      }
+      return res.status(200).json({message: 'OTP sent successfully.'});
+  } catch (error) {
+      console.error("Error sending OTP:", error);
+      return res.status(400).json({message: 'Failed to send OTP.'})
+  }
+};
+
+async function generateToken(user) {
+  try {
+      return jwt.sign({ _id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
+  } catch (err) {
+      console.error('TOKEN_ERROR:', err);
+      throw err;
+  }
+}
+
+exports.verifyOTP = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(400).json({ message: 'User not found' });
+    }
+
+    let paymentOptions = [];
+    if (user.operatorId) {
+      const operator = await Operator.findById(user.operatorId);
+      paymentOptions = operator?.paymentOptions || [];
+    }
+    
+    const token = await generateToken(user);
+
+    res.status(200).json({
+      mobile: user.mobile,
+      id: user._id,
+      fullName: user.name,
+      token: token,
+      role: user.role?.rolename || null,
+      operatorId: user.operatorId,
+      branch: user.branchId ? { id: user.branchId._id, name: user.branchId.name } : null,
+      paymentOptions,
+      message: "LOGGED_IN_SUCCESSFULLY"
+    });
+  } catch (error) {
+    console.error('VERIFY_OTP_ERROR:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+}

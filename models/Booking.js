@@ -45,6 +45,13 @@ const bookingSchema = new mongoose.Schema({
   valueOfGoods: { type: Number, required: true },
   dimensions: String,
 
+  // Payment info
+  paymentStatus: { type: String },
+  qr_payment_id: { type: String },
+  qr_code_id: { type: String },
+  qr_image_url: { type: String },
+  qr_image_location: { type: String },
+
   // Vehicle assignment
   assignedVehicle: 
     {

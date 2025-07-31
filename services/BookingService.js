@@ -7,8 +7,14 @@ const { request } = require('express');
 const Operator = require('../models/Operator');
 const Transaction = require('../models/Transaction');
 const UserService = require('./UserService');
+const whatsappService = require('../services/whatsappService');
+
+const config = process.env;
 
 class BookingService {
+  static booking_confirmed = config.BOOKING_CONFIRMED;
+  static booking_arrived = config.BOOKING_ARRIVED;
+  
   static async initiateBooking(data, userId, operatorId) {
     try {
       logger.info('Booking creation request received', {
@@ -170,6 +176,39 @@ class BookingService {
     }
   }
 
+  static async getBookingByBookingId(bookingId, operatorId, returnRaw = false) {
+    logger.info('Fetching booking by ID', { bookingId });
+
+    try {
+      const booking = await Booking.findOne({ bookingId, operatorId })
+        .populate('fromOffice', '_id name')
+        .populate('toOffice', '_id name')
+        .populate('assignedVehicle', '_id vehicleNumber')
+        .populate('bookedBy', '_id fullName')
+
+      if (!booking) {
+        logger.warn('Booking not found', { bookingId, operatorId });
+        throw new Error('Booking not found');
+      }
+
+      if (returnRaw) {
+        return booking;
+      }
+
+      const result = booking.toObject();
+      result.senderName = result.senderName || result.fromOffice.name;
+      return result;
+    } catch (error) {
+      logger.error('Error getting booking by bookingId', {
+        error: error.message,
+        bookingId,
+        operatorId,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
   /**
    * Confirm a booking by updating cargo balance and creating a transaction
    * @param {Object} booking - The booking document
@@ -211,7 +250,11 @@ class BookingService {
           branch: null, // optional: add branch if you want
         });
       }
-      await booking.save(); // Persist updated booking
+      // Save and populate branch data
+      const savedBooking = await booking.save();
+      const populatedBooking = await Booking.findById(savedBooking._id)
+        .populate('fromOffice', 'name phone')
+        .populate('toOffice', 'name phone');
 
       // Only update cargo balance for 'Paid' bookings
       if (booking.lrType === 'Paid') {
@@ -246,8 +289,38 @@ class BookingService {
         bookingId: booking._id,
         userId,
         lrType: booking.lrType,
-        status: booking.status
+        status: booking.status,
+        populatedBooking
       });
+
+      if (config.WHATSAPP_ENABLED === 'true') {
+        const attributes = [ booking.receiverName, booking.senderName, populatedBooking.fromOffice.name, booking.bookingId, populatedBooking.toOffice.name, populatedBooking.toOffice.phone ];
+        logger.info('WhatsApp message attributes', {
+          attributes
+        });
+
+        /* Dear {{1}}  a parcel is booked for you by {{2}} from {{3}}  with LR NO:{{4}}. Please use this LR NO for reference.
+        This will be transported to our office {{5}} soon. For collecting the package please contact our office at {{6}}.*/
+
+        const whatsappMessage = `Dear ${booking.receiverName} a parcel is booked for you by ${booking.senderName} from ${populatedBooking.fromOffice.name} with LR NO:${booking.bookingId}. Please use this LR NO for reference. This will be transported to our office ${populatedBooking.toOffice.name} soon. For collecting the package please contact our office at ${populatedBooking.toOffice.phone}.`;
+
+        logger.info('WhatsApp message', {
+          whatsappMessage
+        });
+
+        const whatsappResponse = await whatsappService.sendWhatsAppTemplateMessage(booking.receiverPhone, this.booking_confirmed, attributes);
+        if (whatsappResponse.success) {
+          logger.info('WhatsApp message sent successfully', {
+            bookingId: booking.bookingId,
+            userId,
+            lrType: booking.lrType,
+            status: booking.status,
+            whatsappResponse
+          });
+          const response = await whatsappService.saveWhatsAppConversations(whatsappMessage, booking, whatsappResponse);
+          logger.info(response.message);
+        }
+      }
 
     } catch (error) {
       logger.error('Error confirming booking', {
@@ -268,7 +341,7 @@ class BookingService {
     });
 
     try {
-      const booking = await Booking.findOne({ _id: id, operatorId });
+      const booking = await Booking.findOne({ _id: id, operatorId }).populate('fromOffice', 'name phone address').populate('toOffice', 'name phone address');
 
       if (!booking) {
         logger.warn('Booking not found for update', { bookingId: id, operatorId });
@@ -322,6 +395,27 @@ class BookingService {
         operatorId,
         updatedBy: currentUserId
       });
+
+      if (eventType === 'unloaded' && config.WHATSAPP_ENABLED === 'true') {
+        const attributes = [booking.receiverName, booking.bookingId, `${booking.toOffice.address} Phone: ${booking.toOffice.phone}`];
+
+        const whatsAppMessage = `Dear ${booking.receiverName} your package with LR NO: ${booking.bookingId} has arrived at our office location : ${booking.toOffice.address} Phone: ${booking.toOffice.phone}. You can pick the package at your convenience.`;
+
+        /*Dear {{1}} your package with LR NO: {{2}} has arrived at our office location : {{3}}. You can pick the package at your convenience.*/
+        
+        const whatsappResponse = await whatsappService.sendWhatsAppTemplateMessage(booking.receiverPhone, this.booking_arrived, attributes);
+        if (whatsappResponse.success) {
+          logger.info('WhatsApp message sent successfully', {
+            bookingId: booking.bookingId,
+            currentUserId,
+            lrType: booking.lrType,
+            status: booking.status,
+            whatsappResponse
+          });
+          const response = await whatsappService.saveWhatsAppConversations(whatsAppMessage, booking, attributes);
+          logger.info(response.message);
+        }
+      }
 
       return booking;
     } catch (error) {

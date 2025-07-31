@@ -16,6 +16,8 @@ const bookingReportRoutes = require('./bookingReportRoutes');
 const branchReportRoutes = require('./branchReportRoutes');
 
 const eWayBillRoutes = require('./ewayBillRoutes');
+const whatsAppRoutes = require('./whatsAppRoutes');
+const razorpayRoutes = require('./razorPayRoutes');
 
 router.use('/auth', authRoutes);
 router.use('/roles', roleRoutes);
@@ -33,5 +35,7 @@ router.use('/bookingReport', bookingReportRoutes);
 router.use('/branchReport', branchReportRoutes);
 
 router.use('/ewaybill', eWayBillRoutes);
+router.use('/whatsapp', whatsAppRoutes);
+router.use('/razorpay', razorpayRoutes);
 
 module.exports = router;
