@@ -159,11 +159,11 @@ exports.loginWithOTP = async (req, res) => {
             'Content-Type': 'application/json'
           }
         });  
-        console.log("SMS Response:", response.data);
+        logger.info("SMS Response:", response.data);
       }
       return res.status(200).json({message: 'OTP sent successfully.'});
   } catch (error) {
-      console.error("Error sending OTP:", error);
+      logger.error("Error sending OTP:", error);
       return res.status(400).json({message: 'Failed to send OTP.'})
   }
 };
@@ -172,14 +172,14 @@ async function generateToken(user) {
   try {
       return jwt.sign({ _id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
   } catch (err) {
-      console.error('TOKEN_ERROR:', err);
+      logger.error('TOKEN_ERROR:', err);
       throw err;
   }
 }
 
 exports.verifyOTP = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).populate('role', 'rolename').populate('branchId', 'name');
     if (!user) {
       return res.status(400).json({ message: 'User not found' });
     }
@@ -195,7 +195,7 @@ exports.verifyOTP = async (req, res) => {
     res.status(200).json({
       mobile: user.mobile,
       id: user._id,
-      fullName: user.name,
+      fullName: user.fullName,
       token: token,
       role: user.role?.rolename || null,
       operatorId: user.operatorId,
@@ -204,7 +204,7 @@ exports.verifyOTP = async (req, res) => {
       message: "LOGGED_IN_SUCCESSFULLY"
     });
   } catch (error) {
-    console.error('VERIFY_OTP_ERROR:', error);
+    logger.error('VERIFY_OTP_ERROR:', error);
     res.status(500).json({ message: 'Server error' });
   }
 }
