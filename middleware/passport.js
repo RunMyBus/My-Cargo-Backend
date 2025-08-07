@@ -8,6 +8,8 @@ const UserLoginSMSModel = require('../models/UserLoginSMS');
 require('dotenv').config();
 
 const requestContext = require('../utils/requestContext');
+const logger = require('../utils/logger');
+const AppError = require('../utils/AppError');
 
 const localLogin = new LocalStrategy(
     { usernameField: 'mobile', passwordField: 'otp', passReqToCallback: true },
@@ -16,25 +18,23 @@ const localLogin = new LocalStrategy(
         const user = await User.findOne({ mobile });
   
         if (!user) {
-          const error = new Error('Mobile number not found');
-          error.status = 400;
-          error.field = 'mobile';
-          return done(error);
+          return done(new AppError('Mobile number not found', 400, 'MOBILE_NOT_FOUND', 'mobile'));
         }
-        console.log('user', user);
 
-        console.log('mobile', mobile);
-        console.log('otp', otp);
-  
-        const otpRecord = await UserLoginSMSModel.findOne({ mobile: mobile, otp: otp , active: true });
+        const otpRecord = await UserLoginSMSModel.findOne({ 
+          mobile: mobile, 
+          otp: otp, 
+          active: true
+        });
         logger.info('OTP Record:', otpRecord);
-        if (!otpRecord)
-            return done({status: 400, message: 'INVALID OTP'});
+        if (!otpRecord) {
+          return done(new AppError('Invalid OTP', 400, 'INVALID_OTP', 'otp'));
+        }
         
         if (new Date() > otpRecord.expiryTime) {
           otpRecord.active = false;
           await otpRecord.save();
-          return done( {status: 400, message: 'OTP EXPIRED'});
+          return done(new AppError('OTP has expired', 400, 'OTP_EXPIRED', 'otp'));
         }
         otpRecord.active = false;
         await otpRecord.save();
@@ -46,6 +46,10 @@ const localLogin = new LocalStrategy(
           return done(null, user);
         });
       } catch (err) {
+        if (!err.isOperational) {
+          logger.error('Unexpected error in local strategy:', err);
+          return done(new AppError('Authentication failed', 500, 'AUTHENTICATION_ERROR'));
+        }
         return done(err);
       }
     }
