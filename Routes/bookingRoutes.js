@@ -20,6 +20,7 @@ router.get('/export/arrived', bookingController.exportArrivedBookings);
 router.get('/export/in-transit', bookingController.exportInTransitBookings);
 router.get('/all', bookingController.getAllBookings);
 router.get('/contactsByPhone/:phone', bookingController.getContactByPhone);
+router.get('/:bookingId/pdf', bookingController.generateBookingPdf);
 
 // Dynamic routes with :id last
 router.get('/:id', bookingController.getBookingById);

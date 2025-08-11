@@ -4,6 +4,8 @@ const logger = require('../utils/logger');
 const requestContext = require('../utils/requestContext');
 const { Parser } = require('json2csv');
 const ExportService = require('../services/ExportService');
+const generateHTML = require('../utils/bookingTemplate');
+const puppeteer = require('puppeteer');
 
 
 // Create booking
@@ -387,4 +389,47 @@ exports.getContactByPhone = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
+
+// Generate Booking PDF
+exports.generateBookingPdf = async (req, res) => {
+  try {
+    const operatorId = requestContext.getOperatorId();
+    const bookingId = req.params.bookingId;
+
+    if (!bookingId || !operatorId) {
+      return res.status(400).json({ error: 'Booking ID and Operator ID are required' });
+    }
+
+    const booking = await BookingService.getBookingById(bookingId, operatorId);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const html = await generateHTML(booking); // fetch from DB now
+
+    const browser = await puppeteer.launch({ headless: 'new' });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+    });
+
+    await browser.close();
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="booking-${bookingId}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    });
+
+    res.send(pdfBuffer);
+  } catch (error) {
+    logger.error('Error generating booking PDF', { error: error.message });
+    res.status(500).json({ error: 'Failed to generate PDF' });
+  }
+};
+
 
