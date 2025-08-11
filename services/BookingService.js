@@ -233,12 +233,18 @@ class BookingService {
         booking.lrType = updateData.lrType;
       }
 
-      // Update other booking fields
-      if (Array.isArray(updateData.paymentTypes)) booking.paymentTypes = updateData.paymentTypes;
-      if (updateData.status) booking.status = updateData.status;
-      if (!booking.bookedBy) {
-        booking.bookedBy = userId;
-      }
+     // ✅ Update payment type (string only)
+    if (updateData.paymentType) {
+      booking.paymentType = updateData.paymentType; 
+    }
+
+    // Update status
+    if (updateData.status) booking.status = updateData.status;
+
+    // Set bookedBy if missing
+    if (!booking.bookedBy) {
+      booking.bookedBy = userId;
+    }
 
       if (
       booking.status === 'Delivered' && !booking.eventHistory.some(e => e.type === 'delivered')) {

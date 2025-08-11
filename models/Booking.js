@@ -97,7 +97,7 @@ getpackage: {
 
   paymentType: {
     type: String,
-    enum: ['', 'cash', 'UPI'],
+    enum: ['', 'Cash', 'UPI'],
     default: ''
   },
 

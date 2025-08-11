@@ -87,7 +87,7 @@ const processWebhook = async (body) => {
                 const updatedData = {
                     lrType: lrType,
                     status: 'Booked',
-                    paymentTypes: ['UPI']
+                    paymentType: 'UPI'
                 }
 
                 BookingService.collectPayment(booking, userId, updatedData);
