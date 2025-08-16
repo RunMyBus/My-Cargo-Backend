@@ -9,6 +9,7 @@ const Operator = require('../models/Operator');
 const Transaction = require('../models/Transaction');
 const UserService = require('./UserService');
 const whatsappService = require('../services/whatsappService');
+const generatePdfBuffer = require('../utils/bookingTemplate');
 
 const config = process.env;
 
@@ -149,8 +150,8 @@ class BookingService {
 
     try {
       const booking = await Booking.findOne({ _id: id, operatorId })
-        .populate('fromOffice', '_id name')
-        .populate('toOffice', '_id name')
+        .populate('fromOffice', '_id name address phone')
+        .populate('toOffice', '_id name address phone')
         .populate('assignedVehicle', '_id vehicleNumber')
         .populate('bookedBy', '_id fullName')
 
@@ -259,9 +260,7 @@ class BookingService {
       }
       // Save and populate branch data
       const savedBooking = await booking.save();
-      const populatedBooking = await Booking.findById(savedBooking._id)
-        .populate('fromOffice', 'name phone')
-        .populate('toOffice', 'name phone');
+      const populatedBooking = await this.getBookingById(savedBooking._id, savedBooking.operatorId);
 
       // Only update cargo balance for 'Paid' bookings
       if (booking.lrType === 'Paid') {
@@ -301,31 +300,39 @@ class BookingService {
       });
 
       if (config.WHATSAPP_ENABLED === 'true') {
-        const attributes = [ booking.receiverName, booking.senderName, populatedBooking.fromOffice.name, booking.bookingId, populatedBooking.toOffice.name, populatedBooking.toOffice.phone ];
-        logger.info('WhatsApp message attributes', {
-          attributes
-        });
+        logger.info('Generating LR', { bookingId: savedBooking._id });
 
-        /* Dear {{1}}  a parcel is booked for you by {{2}} from {{3}}  with LR NO:{{4}}. Please use this LR NO for reference.
-        This will be transported to our office {{5}} soon. For collecting the package please contact our office at {{6}}.*/
+        const pdfBuffer = await generatePdfBuffer(populatedBooking);
 
-        const whatsappMessage = `Dear ${booking.receiverName} a parcel is booked for you by ${booking.senderName} from ${populatedBooking.fromOffice.name} with LR NO:${booking.bookingId}. Please use this LR NO for reference. This will be transported to our office ${populatedBooking.toOffice.name} soon. For collecting the package please contact our office at ${populatedBooking.toOffice.phone}.`;
-
-        logger.info('WhatsApp message', {
-          whatsappMessage
-        });
-
-        const whatsappResponse = await whatsappService.sendWhatsAppTemplateMessage(booking.receiverPhone, this.booking_confirmed, attributes);
-        if (whatsappResponse.success) {
-          logger.info('WhatsApp message sent successfully', {
-            bookingId: booking.bookingId,
-            userId,
-            lrType: booking.lrType,
-            status: booking.status,
-            whatsappResponse
+        const uploadResponse = await whatsappService.uploadPDF(booking.bookingId, pdfBuffer);
+        if (uploadResponse.success) {
+          const mediaId = uploadResponse.mediaId;
+          const attributes = [ booking.receiverName, booking.senderName, populatedBooking.fromOffice.name, booking.bookingId, populatedBooking.toOffice.name, populatedBooking.toOffice.phone ];
+          logger.info('WhatsApp message attributes', {
+            attributes
           });
-          const response = await whatsappService.saveWhatsAppConversations(whatsappMessage, booking, whatsappResponse);
-          logger.info(response.message);
+
+          /* Dear {{1}}  a parcel is booked for you by {{2}} from {{3}}  with LR NO: {{4}}. Please use this LR NO for reference.
+          This will be transported to our office {{5}} soon. For collecting the package please contact our office at {{6}}.*/
+
+          const whatsappMessage = `Dear ${booking.receiverName} a parcel is booked for you by ${booking.senderName} from ${populatedBooking.fromOffice.name} with LR NO: ${booking.bookingId}. Please use this LR NO for reference. This will be transported to our office ${populatedBooking.toOffice.name} soon. For collecting the package please contact our office at ${populatedBooking.toOffice.phone}.`;
+
+          logger.info('WhatsApp message', {
+            whatsappMessage
+          });
+
+          const whatsappResponse = await whatsappService.sendWhatsAppTemplateMessage(booking.receiverPhone, this.booking_confirmed, attributes, mediaId);
+          if (whatsappResponse.success) {
+            logger.info('WhatsApp message sent successfully', {
+              bookingId: booking.bookingId,
+              userId,
+              lrType: booking.lrType,
+              status: booking.status,
+              whatsappResponse
+            });
+            const response = await whatsappService.saveWhatsAppConversations(whatsappMessage, booking, whatsappResponse);
+            logger.info(response.message);
+          }
         }
       }
 
@@ -407,7 +414,7 @@ class BookingService {
 
         /*Dear {{1}} your package with LR NO: {{2}} has arrived at our office location : {{3}}. You can pick the package at your convenience.*/
         
-        const whatsappResponse = await whatsappService.sendWhatsAppTemplateMessage(booking.receiverPhone, this.booking_arrived, attributes);
+        const whatsappResponse = await whatsappService.sendWhatsAppTemplateMessage(booking.receiverPhone, this.booking_arrived, attributes, null);
         if (whatsappResponse.success) {
           logger.info('WhatsApp message sent successfully', {
             bookingId: booking.bookingId,
@@ -416,7 +423,7 @@ class BookingService {
             status: booking.status,
             whatsappResponse
           });
-          const response = await whatsappService.saveWhatsAppConversations(whatsAppMessage, booking, attributes);
+          const response = await whatsappService.saveWhatsAppConversations(whatsAppMessage, booking, whatsappResponse);
           logger.info(response.message);
         }
       }
@@ -599,7 +606,7 @@ class BookingService {
         .sort({ createdAt: -1 })
         .populate('fromOffice', 'name')
         .populate('toOffice', 'name')
-        .populate('bookedBy', '_id')
+        .populate('bookedBy', '_id fullName')
         .populate('operatorId', '_id')
         .populate('assignedVehicle', '_id vehicleNumber')
       ]);
@@ -609,7 +616,10 @@ class BookingService {
         const bookingObj = b.toObject();
 
         // bookedBy as string _id or null
-        bookingObj.bookedBy = b.bookedBy?._id?.toString() || null;
+        bookingObj.bookedBy = {
+          _id: b.bookedBy?._id?.toString() || null,
+          fullName: b.bookedBy?.fullName
+        };
 
         // operatorId as string _id or null
         bookingObj.operatorId = b.operatorId?._id?.toString() || null;
@@ -690,13 +700,16 @@ class BookingService {
         .populate('toOffice', '_id name')
         .populate('operatorId', '_id')
         .populate('assignedVehicle', '_id vehicleNumber')
-        .populate('bookedBy', '_id')
+        .populate('bookedBy', '_id fullName')
       ]);
 
       const bookings = rawBookings.map(b => {
         const booking = b.toObject();
 
-        booking.bookedBy = b.bookedBy ? b.bookedBy.toString() : null;
+        booking.bookedBy = {
+          _id: b.bookedBy ? b.bookedBy.toString() : null,
+          fullName: b.bookedBy?.fullName
+        };
 
         booking.operatorId = b.operatorId?._id?.toString() || null;
 
@@ -781,13 +794,16 @@ class BookingService {
         .populate('toOffice', '_id name')
         .populate('assignedVehicle', '_id vehicleNumber')
         .populate('operatorId', '_id')
-        .populate('bookedBy', '_id')
+        .populate('bookedBy', '_id fullName')
       ]);
 
       const bookings = rawBookings.map(b => {
         const booking = b.toObject();
 
-        booking.bookedBy = b.bookedBy ? b.bookedBy.toString() : null;
+        booking.bookedBy = {
+          _id: b.bookedBy ? b.bookedBy.toString() : null,
+          fullName: b.bookedBy?.fullName
+        };
         booking.operatorId = b.operatorId?._id?.toString() || null;
 
         booking.assignedVehicle = b.assignedVehicle
@@ -885,7 +901,10 @@ class BookingService {
       const formattedBookings = rawBookings.map(b => {
         const booking = b.toObject();
 
-        booking.bookedBy = b.bookedBy ? b.bookedBy.toString() : null;
+        booking.bookedBy = {
+          _id: b.bookedBy ? b.bookedBy.toString() : null,
+          fullName: b.bookedBy?.fullName
+        };
 
         booking.operatorId = b.operatorId?._id?.toString() || null;
 
@@ -1020,23 +1039,18 @@ class BookingService {
       booking.deliveredBy = userId;
 
       let finalUser = user;
-      // If paymentType is 'cash', update cargo balance
       if(booking.lrType === 'ToPay') {
-        if (updateData.paymentType?.toLowerCase() === 'cash') {
-          const amount = booking.totalAmountCharge || 0;
-          finalUser = await UserService.addToCargoBalance(userId, amount);
+        const amount = booking.totalAmountCharge || 0;
+        finalUser = await UserService.addToCargoBalance(userId, amount);
 
-          await Transaction.create({
-            user: userId,
-            amount: amount,
-            balanceAfter: finalUser.cargoBalance,
-            type: 'Delivered',
-            referenceId: booking._id,
-            description: 'Cargo balance updated from delivery (cash payment)'
-          });
-        } else {
-          //TODO: handle the UPI payment
-        }
+        await Transaction.create({
+          user: userId,
+          amount: amount,
+          balanceAfter: finalUser.cargoBalance,
+          type: 'Delivered',
+          referenceId: booking._id,
+          description: `Cargo balance updated from delivery (${updateData.paymentType} payment)`
+        });
       }
 
       await booking.save();
