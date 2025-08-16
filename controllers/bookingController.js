@@ -112,6 +112,26 @@ exports.updateBooking = async (req, res) => {
   }
 };
 
+// Assign booking to vehicle
+exports.multipleBookingsChange = async (req, res) => {
+  try {
+    const operatorId = requestContext.getOperatorId();
+    const userId = req.user._id;
+    if (!operatorId) {
+      return res.status(400).json({ error: 'Operator ID is required' });
+    }
+    const result = await BookingService.multipleBookings(req.body, operatorId, userId);
+    res.json(result);
+  } catch (error) {
+    console.log(error);
+    if (error.message === 'Booking not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    logger.error(`Error assigning booking to vehicle in controller: ${req.params.id}`, { error: error.message });
+    res.status(400).json({ error: error.message });
+  }
+};
+
 // Delete booking by ID
 exports.deleteBooking = async (req, res) => {
   try {

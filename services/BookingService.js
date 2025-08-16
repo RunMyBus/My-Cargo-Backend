@@ -1,4 +1,5 @@
 const Booking = require('../models/Booking');
+const Vehicle = require('../models/Vehicle');
 const User = require('../models/User');
 const Branch = require('../models/Branch');
 const logger = require('../utils/logger');
@@ -382,10 +383,7 @@ class BookingService {
       }
 
       // Update assignedVehicle if changed or newly assigned
-      if (
-        updateData.assignedVehicle &&
-        (!booking.assignedVehicle || booking.assignedVehicle.toString() !== updateData.assignedVehicle)
-      ) {
+      if (updateData.assignedVehicle && (!booking.assignedVehicle || booking.assignedVehicle.toString() !== updateData.assignedVehicle)) {
         booking.assignedVehicle = updateData.assignedVehicle;
       }
 
@@ -428,6 +426,112 @@ class BookingService {
       logger.error('Error updating booking', {
         error: error.message,
         bookingId: id,
+        operatorId,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  static async multipleBookings(updateData, operatorId, currentUserId) {
+    logger.info('Updating bookings', {
+      bookings: updateData.bookings,
+      operatorId,
+      updateFields: Object.keys(updateData)
+    });
+
+    try {
+      const bookings = await Booking.find({ _id: { $in: updateData.bookings }, operatorId }).populate('fromOffice', 'name phone address').populate('toOffice', 'name phone address');
+
+      if (bookings.length !== updateData.bookings.length) {
+        logger.warn('Some bookings not found for update', {
+          bookings: updateData.bookings,
+          operatorId
+        });
+        throw new Error('Some bookings not found');
+      }
+
+      // Fetch current user's branchId
+      const user = await User.findById(currentUserId).select('branchId');
+      if (!user) throw new Error('User not found');
+      if (!user.branchId) throw new Error('User branch not assigned');
+
+      const now = new Date();
+
+      // Map status to event type
+      const statusToEventMap = {
+        InTransit: 'loaded',
+        Arrived: 'unloaded',
+        Cancelled: 'cancelled'
+      };
+
+      const eventType = statusToEventMap[updateData.status];
+
+      if (eventType) {
+        bookings.forEach(booking => {
+          booking.eventHistory.push({
+            type: eventType,
+            user: currentUserId,
+            date: now,
+            vehicle: updateData.assignedVehicle || booking.assignedVehicle || null,
+            branch: user.branchId
+          });
+        });
+      }
+
+      // Update assignedVehicle if changed or newly assigned
+      bookings.forEach(booking => {
+        if (updateData.assignedVehicle && (!booking.assignedVehicle || booking.assignedVehicle.toString() !== updateData.assignedVehicle)) {
+          booking.assignedVehicle = updateData.assignedVehicle;
+        }
+      });
+
+      // Apply other updates from updateData
+      bookings.forEach(booking => {
+        Object.assign(booking, updateData);
+        booking.updatedAt = now;
+      });
+
+      await Promise.all(bookings.map(booking => booking.save()));
+
+      logger.info('Successfully updated bookings', {
+        bookings: updateData.bookings,
+        newStatus: updateData.status,
+        operatorId,
+        updatedBy: currentUserId
+      });
+
+      if (eventType === 'unloaded' && config.WHATSAPP_ENABLED === 'true') {
+        const promises = bookings.map(booking => {
+          const attributes = [booking.receiverName, booking.bookingId, `${booking.toOffice.address} Phone: ${booking.toOffice.phone}`];
+
+          const whatsAppMessage = `Dear ${booking.receiverName} your package with LR NO: ${booking.bookingId} has arrived at our office location : ${booking.toOffice.address} Phone: ${booking.toOffice.phone}. You can pick the package at your convenience.`;
+
+          /*Dear {{1}} your package with LR NO: {{2}} has arrived at our office location : {{3}}. You can pick the package at your convenience.*/
+
+          return whatsappService.sendWhatsAppTemplateMessage(booking.receiverPhone, this.booking_arrived, attributes).then(whatsappResponse => {
+            if (whatsappResponse.success) {
+              logger.info('WhatsApp message sent successfully', {
+                bookingId: booking.bookingId,
+                currentUserId,
+                lrType: booking.lrType,
+                status: booking.status,
+                whatsappResponse
+              });
+              return whatsappService.saveWhatsAppConversations(whatsAppMessage, booking, attributes);
+            }
+          });
+        });
+
+        await Promise.all(promises);
+      }
+
+      return bookings;
+    } catch (error) {
+      console.log(error);
+      logger.error('Error updating bookings', {
+        error: error.message,
+        bookings: updateData.bookings,
         operatorId,
         stack: error.stack
       });
@@ -614,7 +718,7 @@ class BookingService {
         count: bookings.length,
       };
 
-      logger.info('Successfully fetched assigned bookings', { 
+      logger.info('Successfully fetched assigned bookings', {
         total,
         returned: bookings.length,
         operatorId,
@@ -638,15 +742,15 @@ class BookingService {
   }
 
   static async getInTransitBookings(operatorId, userId, page = 1, limit = 10, query = "", branchIds = []) {
-    logger.info('Fetching in-transit bookings', { 
+    logger.info('Fetching in-transit bookings', {
       operatorId,
       branchIds,
       userId,
-      page, 
-      limit, 
-      query: query || 'none' 
+      page,
+      limit,
+      query: query || 'none'
     });
-    
+
     try {
       const skip = (page - 1) * limit;
       const baseFilter = {

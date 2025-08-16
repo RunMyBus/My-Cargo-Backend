@@ -26,6 +26,7 @@ router.get('/:bookingId/pdf', bookingController.generateBookingPdf);
 router.get('/:id', bookingController.getBookingById);
 router.put('/confirmBooking/:bookingId', bookingController.collectPayment);
 router.put('/:id', bookingController.updateBooking);
+router.post('/multipleBookingsChange', bookingController.multipleBookingsChange);
 router.put('/deliver/:bookingId', bookingController.markAsDelivered);
 router.delete('/:id', bookingController.deleteBooking);
 
