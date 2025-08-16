@@ -118,6 +118,7 @@ exports.multipleBookingsChange = async (req, res) => {
     if (!operatorId) {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
+
     const result = await BookingService.multipleBookings(req.body, operatorId, userId);
     res.json(result);
   } catch (error) {
