@@ -3,10 +3,14 @@ const config = process.env;
 const logger = require('../utils/logger');
 const WhatsAppMessage = require('../models/WhatsAppMessage');
 const WhatsAppConversation = require('../models/WhatsAppConversation');
-const requestContext = require('../utils/requestContext');
+
+const FormData = require('form-data');
+const fs = require('fs');
+const path = require('path');
 
 let API_URL = config.WHATSAPP_MESSAGE_URL;
 let API_KEY = config.WHATSAPP_API_TOKEN;
+let MEDIA_API_URL = config.WHATSAPP_MEDIA_URL;
 
 /**
  * Format phone number
@@ -37,34 +41,46 @@ function formatPhoneNumber(phoneNumber) {
  * @param {string} mobile - Mobile number
  * @param {string} templateName - Template name
  * @param {Array} attributes - Template attributes should be passed in specified template order only
+ * @param {string} mediaId - Media ID
  * @returns {Promise<object>} - Response from WhatsApp API
  */
-async function sendWhatsAppTemplateMessage(mobile, templateName, attributes) {
+async function sendWhatsAppTemplateMessage(mobile, templateName, attributes, mediaId) {
     logger.info('Sending WhatsApp template message', {
         mobile,
         templateName,
         attributes
     });
-    try {
-        const response = await axios.post(API_URL, {
-            message: [
-                {
-                    recipient_whatsapp: formatPhoneNumber(mobile),
-                    message_type: "template",
-                    recipient_type: "individual",
-                    type_template: [
-                        {
-                            name: templateName,
-                            attributes: attributes,
-                            language: {
-                                locale: "en",
-                                policy: "deterministic"
-                            }
+
+    const payload = {
+        message: [
+            {
+                recipient_whatsapp: formatPhoneNumber(mobile),
+                message_type: mediaId ? "media_template" : "template",
+                recipient_type: "individual",
+                type_template: [
+                    {
+                        name: templateName,
+                        attributes: attributes,
+                        language: {
+                            locale: "en",
+                            policy: "deterministic"
                         }
-                    ]
-                }
-            ]
-        }, {
+                    }
+                ]
+            }
+        ]
+    }
+
+    // If mediaId exists, add type_media_template
+    if (mediaId) {
+        payload.message[0].type_media_template = {
+            type: "document",
+            media_id: mediaId
+        };
+    }
+
+    try {
+        const response = await axios.post(API_URL, payload, {
             headers: {
                 'Authorization': `Bearer ${API_KEY}`,
                 'Content-Type': 'application/json'
@@ -101,12 +117,10 @@ async function saveWhatsAppConversations(message, cargoBooking, response) {
         const whatsAppMessage = new WhatsAppMessage.model({
             message,
             incoming: false,
-            response: response?.toString(),
-            // sentBy: message.from,
-            // sentByUserName: requestContext.getCurrentUser()?.userName,
+            response: JSON.stringify(response),
             sentAt: new Date(),
             bookingId: cargoBooking?.id,
-            operatorId: requestContext.getOperatorId()
+            operatorId: cargoBooking?.operatorId
         });
 
         const phoneNumber = formatPhoneNumber(cargoBooking.receiverPhone?.toString());
@@ -114,7 +128,7 @@ async function saveWhatsAppConversations(message, cargoBooking, response) {
         const existingConversation = await WhatsAppConversation.findOne({
             phoneNumber,
             referenceType: WhatsAppConversation.CARGO_BOOKING_TYPE,
-            operatorId: requestContext.getOperatorId()
+            operatorId: cargoBooking?.operatorId
         });
 
         if (existingConversation) {
@@ -127,7 +141,7 @@ async function saveWhatsAppConversations(message, cargoBooking, response) {
                 phoneNumber,
                 from: config.NETCORE_PHONE_NUMBER,
                 replyPending: false,
-                operatorId: requestContext.getOperatorId(),
+                operatorId: cargoBooking?.operatorId,
                 referenceType: WhatsAppConversation.CARGO_BOOKING_TYPE
             });
             await newConversation.save();
@@ -141,7 +155,57 @@ async function saveWhatsAppConversations(message, cargoBooking, response) {
     }
 }
 
+async function uploadPDF(bookingId, pdfBuffer) {
+    try {
+        // Create a temporary file
+        const tempFilePath = path.join('/tmp', `${bookingId}.pdf`);
+        fs.writeFileSync(tempFilePath, pdfBuffer);
+        
+        // Create form data
+        const form = new FormData();
+        form.append('file', fs.createReadStream(tempFilePath), {
+            filename: `${bookingId}.pdf`,
+            contentType: 'application/pdf',
+            knownLength: pdfBuffer.length
+        });
+
+        // Get headers from form data
+        const formHeaders = form.getHeaders();
+
+        // Send POST request
+        const response = await axios.post(`${MEDIA_API_URL}/upload/`, form, {
+            headers: {
+                ...formHeaders,
+                'Authorization': `Bearer ${API_KEY}`,
+            },
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+        });
+
+        // Clean up temporary file
+        fs.unlinkSync(tempFilePath);
+
+        if (response.status !== 200 || response.data.status.toLowerCase() !== 'success') {
+            logger.error("Media Upload failed:", response.data);
+            return { success: false, error: response.data };
+        }
+
+        logger.info("Media Upload success:", response.data);
+        return { 
+            success: true, 
+            mediaId: response.data.data.mediaId 
+        };
+    } catch (error) {
+        logger.error("Media Upload failed:", error);
+        return { 
+            success: false, 
+            error: error.response?.data?.message || error.message 
+        };
+    }
+}
+
 module.exports = {
     sendWhatsAppTemplateMessage,
-    saveWhatsAppConversations
+    saveWhatsAppConversations,
+    uploadPDF
 };

@@ -129,7 +129,7 @@ const seedData = async () => {
         phone: `${faker.number.int({ min: 6000000000, max: 9999999999 })}`,
         status: 'Active',
         bookingSequence: 1000,
-        paymentOptions: ['cash', 'UPI'],
+        paymentOptions: ['Cash', 'UPI'],
       });
       operators.push(operator);
     }
@@ -399,7 +399,7 @@ const seedData = async () => {
     const packageTypes = ['Electronics', 'Clothing', 'Documents', 'Furniture', 'Food', 'Medical', 'Automotive', 'Industrial', 'Retail', 'Personal'];
     const statuses = ['Booked', 'InTransit', 'Cancelled', 'Arrived', 'Delivered'];
     const lrTypes = ['Paid', 'ToPay'];
-    const paymentModes = ['cash', 'UPI'];
+    const paymentModes = ['Cash', 'UPI'];
     const bookingSources = ['Web', 'Mobile', 'Walk-in', 'Call', 'Email', 'Partner'];
     const currentDay = moment().format('YYYY-MM-DD');
     

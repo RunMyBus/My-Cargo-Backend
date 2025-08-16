@@ -110,6 +110,29 @@
 				},
 				{
 					"name": "verifyOTP",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"let response = pm.response.json();",
+									"",
+									"console.log('response', response);",
+									"",
+									"// Extract the token from response.data.token",
+									"let token = response.token;",
+									"",
+									"// Save to a collection variable",
+									"pm.collectionVariables.set(\"token\", token);",
+									"",
+									"// Optional: Debug output",
+									"console.log(\"Token set to collection variable:\", token);"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
 					"request": {
 						"method": "POST",
 						"header": [
@@ -1048,6 +1071,63 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Initiate Booking",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"id\": \"CFB-1754415458392\",\n    \"senderName\": \"Chanakya\",\n    \"senderPhone\": \"9390015863\",\n    \"senderEmail\": \"\",\n    \"senderAddress\": \"\",\n    \"receiverName\": \"Divyesh N\",\n    \"receiverPhone\": \"9966992346\",\n    \"receiverEmail\": \"\",\n    \"receiverAddress\": \"\",\n    \"fromOffice\": \"6889e42ef71628bd9966afc1\",\n    \"toOffice\": \"6889e42ef71628bd9966afc3\",\n    \"dispatchDate\": \"2025-08-05\",\n    \"arrivalDate\": \"2025-08-05\",\n    \"packageDescription\": \"Furniture\",\n    \"valueOfGoods\": \"10000\",\n    \"quantity\": \"2\",\n    \"weight\": \"100\",\n    \"freightCharge\": 20,\n    \"loadingCharge\": 20,\n    \"unloadingCharge\": 0,\n    \"gst\": 1,\n    \"totalAmountCharge\": 41,\n    \"paymentType\": \"\",\n    \"wayBillNo\": \"\",\n    \"getpackage\": \"\",\n    \"createdAt\": \"2025-08-05T17:37:38.392Z\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/bookings/initiateBooking",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"bookings",
+								"initiateBooking"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Confirm Booking",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"lrType\": \"Paid\",\n    \"paymentTypes\": [\n        \"cash\"\n    ],\n    \"status\": \"Booked\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/bookings/confirmBooking/6892416290b53ea3fb5d0930",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"bookings",
+								"confirmBooking",
+								"6892416290b53ea3fb5d0930"
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		},
@@ -1406,7 +1486,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"fromPlace\": \"Kukatpally\",\n    \"fromState\": 29,\n    \"ewbNo\": 141011741428,\n    \"vehicleNo\": \"AP39KX1234\"\n}",
+							"raw": "{\n    \"fromPlace\": \"Kukatpally\",\n    \"fromState\": 29,\n    \"ewbNo\": 14s1011767073,\n    \"vehicleNo\": \"AP39KX1230\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -1460,6 +1540,43 @@
 								"api",
 								"ewaybill",
 								"updateTransporter"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "verifyWayBillNumber",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/ewaybill/verifyEWayBillNumber?waybillNumber=151011767073",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"ewaybill",
+								"verifyEWayBillNumber"
+							],
+							"query": [
+								{
+									"key": "waybillNumber",
+									"value": "151011767073"
+								}
 							]
 						}
 					},
@@ -1547,6 +1664,25 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "Payment Options",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/operators/payment",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"operators",
+						"payment"
+					]
+				}
+			},
+			"response": []
 		}
 	],
 	"auth": {
@@ -1554,7 +1690,7 @@
 		"bearer": [
 			{
 				"key": "token",
-				"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODUwZjE4MGUzMjdlMjE5ZTFlYmMzYWEiLCJpYXQiOjE3NTAxMzcxMjIsImV4cCI6MTc1MDIyMzUyMn0.QRt_FFLsHlg7JiJNf-7kjszJCJkISMOah2fm9up803w",
+				"value": "{{token}}",
 				"type": "string"
 			}
 		]
@@ -1583,14 +1719,14 @@
 	],
 	"variable": [
 		{
-			"key": "token",
-			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYmM0YjhkOWZhMzRhMWM1Yjk1OTQiLCJpYXQiOjE3NDk4MDQ4MjIsImV4cCI6MTc0OTg5MTIyMn0.vg6sb6lva2CUAMT4M3R4kLqS7BPXtXBm97S6h1VDmts",
-			"type": "string"
-		},
-		{
 			"key": "base_url",
 			"value": "http://localhost:4600",
 			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODU4ZmIyNjU4YjdlMjU4MGU1NWRjYWQiLCJpYXQiOjE3NTQwNjM3OTYsImV4cCI6MTc1NDE1MDE5Nn0.Hr0HGwR3baIxrj3vsVPZgchm9Y9hpl2HMPWkydubVSQ",
+			"type": "default"
 		}
 	]
 }

@@ -19,7 +19,7 @@ exports.generateQRCode = async (req, res) => {
       const bookingId = req.params.bookingId;
       const lrType = req.body.lrType;
       const status = req.body.status;
-      const paymentTypes = req.body.paymentTypes;
+      const paymentType = req.body.paymentType;
 
       if (!bookingId) {
         return res.status(400).json({ success: false, error: 'Booking ID is required' });
@@ -31,8 +31,11 @@ exports.generateQRCode = async (req, res) => {
       // Check if Razorpay is enabled
       if (config.RAZORPAY_ENABLED === 'false') {
 
-        //  Apply update from frontend
-        await BookingService.collectPayment(booking, req.user._id, { lrType, status, paymentTypes });
+        if (lrType === 'Paid') {
+            await BookingService.collectPayment(booking, req.user._id, { lrType, status, paymentType });
+        } else {
+            await BookingService.markAsDelivered(booking, req.user._id, { lrType, status, paymentType });
+        }
     
         return res.status(200).json({ message: 'Payment collected successfully' });
       }
@@ -63,6 +66,8 @@ const processWebhook = async (body) => {
         const lrType = body.payload?.qr_code?.entity?.notes?.lrType || 
                          body.payload?.payment?.entity?.notes?.lrType;
 
+        logger.info('Notes from webhook', { bookingId, operatorId, userId, lrType });
+
         // Find or create the webhook record for this booking
         const webhookRecord = await RazorpayWebhook.findOneAndUpdate(
             { bookingId },
@@ -86,11 +91,15 @@ const processWebhook = async (body) => {
 
                 const updatedData = {
                     lrType: lrType,
-                    status: 'Booked',
+                    status: lrType === 'Paid' ? 'Booked': 'Delivered',
                     paymentType: 'UPI'
                 }
 
-                BookingService.collectPayment(booking, userId, updatedData);
+                if (updatedData.lrType === 'Paid') {
+                    BookingService.collectPayment(booking, userId, updatedData);
+                } else {
+                    BookingService.markAsDelivered(booking, userId, updatedData);
+                }
 
                 logger.info('Successfully updated booking status', { bookingId, operatorId, userId });
             } else {
@@ -113,7 +122,6 @@ const processWebhook = async (body) => {
 exports.handleWebhook = async (req, res) => {
     try {
         const { body } = req;
-        logger.info('handleWebhook', body);
         
         // Process webhook in background
         processWebhook(body);

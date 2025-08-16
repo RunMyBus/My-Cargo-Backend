@@ -33,38 +33,61 @@ const parseErrorCodes = (error) => {
 const handleEwayBillResponse = async (response, retryOnCode, retryData) => {
     const responseBody = response.data;
     
-    if (responseBody.status_cd === '1' && responseBody.data.transUpdateDate) {
+    // Update vehicle number response
+    if (responseBody.status_cd === '1' && ( responseBody.data.transUpdateDate || responseBody.data.vehUpdDate )) {
         logger.info('Successfully updated', { response: responseBody.data });
-        return { success: true, message: 'Successfully updated', updatedDate: responseBody.data.transUpdateDate };
+        return { success: true, message: 'Successfully updated', updatedDate: responseBody.data.transUpdateDate, vehicleUpdateDate: responseBody.data.vehUpdDate };
     }
 
-    logger.error('Failed to update', { response: responseBody });
+    // Get waybill details response
+    if (responseBody.status_cd === '1' && responseBody.data.ewbNo) {
+        logger.info('Successfully fetched', { response: responseBody.data.ewbNo });
+        return { success: true, message: 'Successfully fetched', waybillNumber: responseBody.data.ewbNo };
+    }
+
+    logger.error('Failed to update/fetch', { response: responseBody });
     if (responseBody.status_desc) {
         return { success: false, message: responseBody.status_desc };
     }
 
     const { errorCodes, descriptions } = parseErrorCodes(responseBody.error);
     
-    // If specified error code is found, retry after authentication
+    // If specified error code (238 - authentications failed) occurs, retry after authentication
     if (errorCodes.includes(retryOnCode)) {
         const authResponse = await authenticate();
         if (authResponse.success) {
-            const retryResponse = await axios.post(
-                buildEwayBillUrl(retryData.endpoint),
-                retryData.body,
-                { headers: EWB_Headers }
-            );
-            const retryBody = retryResponse.data;
-            if (retryBody.status_cd === '1' && retryBody.data.transUpdateDate) {
-                logger.info('Successfully updated after authentication', { response: retryBody.data });
-                return { success: true, message: 'Successfully updated', updatedDate: retryBody.data.transUpdateDate };
+            let retryResponse;
+            let retryBody;
+            if (retryData.endpoint === 'getewaybill') {
+                retryResponse = await axios.get(
+                    `${buildEwayBillUrl(retryData.endpoint)}&ewbNo=${retryData.body.waybillNumber}`,
+                    { headers: EWB_Headers }
+                );
+                retryBody = retryResponse.data;
+                if (retryBody.status_cd === '1' && retryBody.data.ewbNo === retryData.body.waybillNumber) {
+                    logger.info('Successfully fetched after authentication', { response: retryBody.data });
+                    return { success: true, message: 'Successfully fetched' };
+                }
+            } else {
+                retryResponse = await axios.post(
+                    buildEwayBillUrl(retryData.endpoint),
+                    retryData.body,
+                    { headers: EWB_Headers }
+                );
+                retryBody = retryResponse.data;
+                if (retryBody.status_cd === '1' && retryBody.data.transUpdateDate) {
+                    logger.info('Successfully updated after authentication', { response: retryBody.data });
+                    return { success: true, message: 'Successfully updated', updatedDate: retryBody.data.transUpdateDate };
+                }
             }
         }
     }
 
+    logger.error('Error from eWayBill', { errorCodes, descriptions });
+
     return {
         success: false,
-        message: 'Failed to update',
+        message: 'Failed to update/fetch',
         errorCode: errorCodes,
         descriptions
     };
@@ -72,13 +95,13 @@ const handleEwayBillResponse = async (response, retryOnCode, retryData) => {
 
 const authenticate = async () => {
     try {
-        const response = await axios.post(`${ewayBillBaseUrl}/ewaybillapi/v1.03/ewayapi/authenticate?email=${ewayBillEmail}`, 
-            {
-                username: ewayBillUsername,
-                password: ewayBillPassword
-            },
+        const response = await axios.get(`${ewayBillBaseUrl}/ewaybillapi/v1.03/authenticate?email=${ewayBillEmail}&username=${ewayBillUsername}&password=${ewayBillPassword}`,
             { headers: EWB_Headers }
         );
+        if (response.data.status_cd !== '1') {
+            logger.error('Authentication failed', { error: response.data });
+            return { success: false, error: response.data };
+        }
         return { success: true, message: 'Authentication successful' };
     } catch (error) {
         logger.error('Authentication failed', { error: error.message });
@@ -86,7 +109,21 @@ const authenticate = async () => {
     }
 };
 
+const getWayBillDetails = async (waybillNumber) => {
+    logger.info('Getting waybill details', { waybillNumber });
+    try {
+        const response = await axios.get(`${buildEwayBillUrl('getewaybill')}&ewbNo=${waybillNumber}`,
+            { headers: EWB_Headers }
+        );
+        return handleEwayBillResponse(response, '238', { endpoint: 'getewaybill', body: { waybillNumber } });
+    } catch (error) {
+        logger.error('Verification failed', { error: error.message });
+        return { success: false, message: error.message };
+    }
+};
+
 const updateTransporter = async (ewbNo, transporterId) => {
+    logger.info('Updating vehicle number in eWayBill', { ewbNo, transporterId });
     try {
         const response = await axios.post(
             buildEwayBillUrl('updatetransporter'),
@@ -105,6 +142,7 @@ const updateTransporter = async (ewbNo, transporterId) => {
 };
 
 const updateVehicleNumber = async (body) => {
+    logger.info('Updating vehicle number in eWayBill', { body });
     try {
         const response = await axios.post(
             buildEwayBillUrl('vehewb'),
@@ -141,5 +179,6 @@ const updateVehicleNumber = async (body) => {
 module.exports = {
     authenticate,
     updateTransporter,
-    updateVehicleNumber
+    updateVehicleNumber,
+    getWayBillDetails
 };
