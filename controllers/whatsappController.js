@@ -5,6 +5,90 @@ const WhatsAppJSONMessage = require('../models/WhatsAppJSONMessage');
 const WhatsAppConversation = require('../models/WhatsAppConversation');
 const WhatsAppMessage = require('../models/WhatsAppMessage');
 
+const XLSX = require('xlsx');
+const fs = require('fs');
+
+exports.getWhatsAppReport = async (req, res) => {
+try {
+        const operatorId = requestContext.getOperatorId();
+        console.log(operatorId);
+        if (!operatorId) {
+            return res.status(400).json({ error: 'Operator ID is required' });
+        }
+
+        // Aggregate to get count of template messages (incoming: false) by phone number
+        const reportData = await WhatsAppConversation.aggregate([
+            { $match: { operatorId } },
+            { $unwind: '$messages' },
+            { $match: { 'messages.incoming': false } },
+            {
+                $group: {
+                    _id: '$phoneNumber',
+                    phoneNumber: { $first: '$phoneNumber' },
+                    templateMessageCount: { $sum: 1 },
+                    lastMessageDate: { $max: '$messages.sentAt' }
+                }
+            },
+            { $sort: { lastMessageDate: -1 } }
+        ]);
+
+        if (reportData.length === 0) {
+            return res.status(404).json({ message: 'No template messages found' });
+        }
+
+        // Format data for Excel
+        const formattedData = reportData.map(item => ({
+            'Phone Number': item.phoneNumber ? item.phoneNumber.replace(/^91/, '') : 'N/A',
+            'Messages Sent': item.templateMessageCount,
+            'Last Message Date': item.lastMessageDate ? new Date(item.lastMessageDate).toLocaleString() : 'N/A'
+        }));
+
+        // Create workbook and worksheet
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(formattedData);
+        
+        // Set column widths
+        const wscols = [
+            { wch: 20 }, // Phone Number
+            { wch: 20 }, // Template Messages
+            { wch: 25 }  // Last Message Date
+        ];
+        ws['!cols'] = wscols;
+
+        // Add worksheet to workbook
+        XLSX.utils.book_append_sheet(wb, ws, 'WhatsApp Template Messages');
+
+        // Generate Excel file
+        const fileName = `whatsapp_template_report_${new Date().toISOString().split('T')[0]}.xlsx`;
+        const filePath = `./temp/${fileName}`;
+        
+        // Ensure temp directory exists
+        if (!fs.existsSync('./temp')) {
+            fs.mkdirSync('./temp');
+        }
+
+        // Write a file
+        XLSX.writeFile(wb, filePath);
+
+        // Send the file for download
+        res.download(filePath, fileName, (err) => {
+            if (err) {
+                logger.error('Error sending WhatsApp report file', { error: err.message });
+                return res.status(500).json({ error: 'Error downloading report' });
+            }
+            // Delete the temporary file after sending
+            fs.unlinkSync(filePath);
+        });
+
+    } catch (error) {
+        logger.error('Error generating WhatsApp report', { error: error.message, stack: error.stack });
+        res.status(400).json({
+            error: 'Failed to generate WhatsApp report',
+            message: error.message
+        });
+    }
+};
+
 exports.incomingWhatsAppReply = async (req, res) => {
     try {
         logger.info('processing incoming whatsapp reply');
@@ -108,8 +192,7 @@ const processIncomingMessage = async (message) => {
             // Find or create conversation
             const phoneNumber = msg.from;
             const existingConversation = await WhatsAppConversation.findOne({
-                phoneNumber,
-                operatorId: requestContext.getOperatorId()
+                phoneNumber
             });
 
             if (existingConversation) {
@@ -121,8 +204,7 @@ const processIncomingMessage = async (message) => {
                     messages: [ whatsAppMessage ],
                     phoneNumber,
                     from: config.NETCORE_PHONE_NUMBER,
-                    replyPending: true,
-                    operatorId: requestContext.getOperatorId()
+                    replyPending: true
                 });
                 await newConversation.save();
             }

@@ -4,9 +4,7 @@ const logger = require('../utils/logger');
 const requestContext = require('../utils/requestContext');
 const { Parser } = require('json2csv');
 const ExportService = require('../services/ExportService');
-const generateHTML = require('../utils/bookingTemplate');
-const puppeteer = require('puppeteer');
-
+const generatePdfBuffer = require('../utils/bookingTemplate');
 
 // Create booking
 exports.initiateBooking = async (req, res) => {
@@ -406,18 +404,7 @@ exports.generateBookingPdf = async (req, res) => {
       return res.status(404).json({ error: 'Booking not found' });
     }
 
-    const html = await generateHTML(booking); // fetch from DB now
-
-    const browser = await puppeteer.launch({ headless: 'new' });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-    });
-
-    await browser.close();
+    const pdfBuffer = await generatePdfBuffer(booking);
 
     res.set({
       'Content-Type': 'application/pdf',
