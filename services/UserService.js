@@ -9,22 +9,27 @@ class UserService {
   /**
    * Get all users for an operator
    * @param {string} operatorId - The operator ID
+   * @param {string} userRole - Current user's role name
    * @returns {Promise<Array>} List of users
    */
-  static async getUsers(operatorId) {
-    logger.info('Fetching users', { operatorId });
+  static async getUsers(operatorId, userRole) {
+    logger.info('Fetching users', { operatorId, userRole });
     
-    if (!operatorId) {
+    const isSuperUser = userRole === 'Super User';
+    
+    if (!operatorId && !isSuperUser) {
       logger.error('Operator ID is required for fetching users');
       throw new Error('Operator ID is required');
     }
     
     try {
-      const users = await User.find({ operatorId });
-      logger.info('Successfully fetched users', { count: users.length, operatorId });
+      // For Super User, fetch all users; otherwise filter by operatorId
+      const query = isSuperUser ? {} : { operatorId };
+      const users = await User.find(query);
+      logger.info('Successfully fetched users', { count: users.length, operatorId, isSuperUser });
       return users;
     } catch (error) {
-      logger.error('Error fetching users', { error: error.message, operatorId, stack: error.stack });
+      logger.error('Error fetching users', { error: error.message, operatorId, userRole, stack: error.stack });
       throw error;
     }
   }
@@ -234,12 +239,15 @@ class UserService {
    * @param {number} options.page - Page number
    * @param {number} options.limit - Items per page
    * @param {string} options.operatorId - Operator ID
+   * @param {string} options.userRole - Current user's role name
    * @returns {Promise<Object>} Search results
    */
-  static async searchUsers({ query = "", page = 1, limit = 10, operatorId }) {
-    logger.info('Searching users', { query, page, limit, operatorId });
+  static async searchUsers({ query = "", page = 1, limit = 10, operatorId, userRole }) {
+    logger.info('Searching users', { query, page, limit, operatorId, userRole });
     
-    if (!operatorId) {
+    const isSuperUser = userRole === 'Super User';
+    
+    if (!operatorId && !isSuperUser) {
       logger.error('Operator ID is required for user search');
       throw new Error('Operator ID is required');
     }
@@ -248,7 +256,9 @@ class UserService {
       const regex = new RegExp(query, "i");
       const skip = (page - 1) * limit;
       const queryObj = query ? { fullName: regex } : {};
-      const baseQuery = { operatorId, ...queryObj };
+      
+      // For Super User, don't filter by operatorId
+      const baseQuery = isSuperUser ? queryObj : { operatorId, ...queryObj };
       
       const [total, users] = await Promise.all([
         User.countDocuments(baseQuery),
@@ -264,7 +274,8 @@ class UserService {
         total, 
         page, 
         totalPages: Math.ceil(total / limit),
-        resultCount: users.length 
+        resultCount: users.length,
+        isSuperUser
       });
 
       return {
@@ -278,6 +289,7 @@ class UserService {
         error: error.message, 
         query, 
         operatorId,
+        userRole,
         stack: error.stack 
       });
       throw error;

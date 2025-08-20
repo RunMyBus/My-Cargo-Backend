@@ -9,12 +9,13 @@ const AppError = require('../utils/AppError');
  */
 exports.getUsers = catchAsync(async (req, res) => {
   const operatorId = req.user?.operatorId;
+  const userRole = req.user?.role?.rolename;
   
-  if (!operatorId) {
+  if (!operatorId && userRole !== 'Super User') {
     throw new AppError('Operator ID not found in user context', 400, 'MISSING_OPERATOR_ID');
   }
 
-  const users = await UserService.getUsers(operatorId);
+  const users = await UserService.getUsers(operatorId, userRole);
   
   res.status(200).json({
     success: true,
@@ -113,12 +114,16 @@ exports.searchUsers = async (req, res) => {
   try {
     const { query = "", page = 1, limit = 10 } = req.body;
     const operatorId = req.user?.operatorId;
-
+    
+    // Get user's role information
+    const userRole = req.user?.role?.rolename;
+    
     const result = await UserService.searchUsers({
       query,
       page: Number(page),
       limit: Number(limit),
       operatorId,
+      userRole,
       createdBy: userId
     });
 
