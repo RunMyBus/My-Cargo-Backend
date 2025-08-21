@@ -5,10 +5,20 @@ const logger = require('../utils/logger');
 
 // Register date formatting helper
 Handlebars.registerHelper('formatDate', function (date) {
+  if (!date) return "—";
   return new Date(date).toLocaleString("en-IN", {
     year: "numeric", month: "short", day: "numeric",
     hour: "2-digit", minute: "2-digit", second: "2-digit"
   });
+});
+
+
+//  Default fallback helper
+Handlebars.registerHelper('default', function (value, fallback) {
+  if (value === null || value === undefined || value === '') {
+    return fallback;
+  }
+  return value;
 });
 
 module.exports = async function generatePdfBuffer(booking, templateName = 'booking_receipt') {
