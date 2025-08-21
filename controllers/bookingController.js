@@ -157,12 +157,11 @@ exports.getUnassignedBookings = async (req, res) => {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
 
-    const { page = 1, limit = 10, query = "", branches } = req.body;
-    
+    const { page = 1, limit = 10, query = "", branches, status = "" } = req.body;
     // If no branches specified, get the logged-in user's branch
     const branchIds = branches ? branches : [];
 
-    const result = await BookingService.getUnassignedBookings(operatorId, page, limit, query, branchIds);
+    const result = await BookingService.getUnassignedBookings(operatorId, page, limit, query, branchIds, status);
     res.json(result);
   } catch (error) {
     logger.error('Error getting unassigned bookings in controller', { error: error.message });
@@ -198,11 +197,9 @@ exports.getInTransitBookings = async (req, res) => {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
 
-    const { page = 1, limit = 10, query = "", branches } = req.body;
-    
+    const { page = 1, limit = 10, query = "", branches, status = "" } = req.body;
     const branchIds = branches ? branches : [];
-
-    const result = await BookingService.getInTransitBookings(operatorId, userId, page, limit, query, branchIds);
+    const result = await BookingService.getInTransitBookings(operatorId, userId, page, limit, query, branchIds, status);
     res.json(result);
   } catch (error) {
     logger.error('Error getting in-transit bookings in controller', { error: error.message });
@@ -220,11 +217,11 @@ exports.getArrivedBookings = async (req, res) => {
       return res.status(400).json({ error: 'Operator ID is required' });
     }
 
-    const { page = 1, limit = 10, query = "", branches } = req.body;
+    const { page = 1, limit = 10, query = "", branches, status = '' } = req.body;
 
     const branchIds = branches ? branches : [];
 
-    const result = await BookingService.getArrivedBookings(operatorId, userId, page, limit, query, branchIds);
+    const result = await BookingService.getArrivedBookings(operatorId, userId, page, limit, query, branchIds, status);
 
     res.json(result);
   } catch (error) {
