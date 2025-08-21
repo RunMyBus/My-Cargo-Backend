@@ -16,7 +16,7 @@ const config = process.env;
 class BookingService {
   static booking_confirmed = config.BOOKING_CONFIRMED;
   static booking_arrived = config.BOOKING_ARRIVED;
-  
+
   static async initiateBooking(data, userId, operatorId) {
     try {
       logger.info('Booking creation request received', {
@@ -109,7 +109,7 @@ class BookingService {
 
   static async getAllBookings(operatorId) {
     logger.info('Fetching all bookings', { operatorId });
-    
+
     try {
       const [bookings, totalCount] = await Promise.all([
         Booking.find({ operatorId })
@@ -128,18 +128,18 @@ class BookingService {
         createdAt: { $gte: todayStart },
       });
 
-      logger.info('Successfully fetched all bookings', { 
-        totalCount, 
+      logger.info('Successfully fetched all bookings', {
+        totalCount,
         todayCount,
-        operatorId 
+        operatorId
       });
 
       return { bookings, totalCount, todayCount };
     } catch (error) {
-      logger.error('Error getting all bookings', { 
-        error: error.message, 
+      logger.error('Error getting all bookings', {
+        error: error.message,
         operatorId,
-        stack: error.stack 
+        stack: error.stack
       });
       throw error;
     }
@@ -237,7 +237,7 @@ class BookingService {
 
      // ✅ Update payment type (string only)
     if (updateData.paymentType) {
-      booking.paymentType = updateData.paymentType; 
+      booking.paymentType = updateData.paymentType;
     }
 
     // Update status
@@ -413,7 +413,7 @@ class BookingService {
         const whatsAppMessage = `Dear ${booking.receiverName} your package with LR NO: ${booking.bookingId} has arrived at our office location : ${booking.toOffice.address} Phone: ${booking.toOffice.phone}. You can pick the package at your convenience.`;
 
         /*Dear {{1}} your package with LR NO: {{2}} has arrived at our office location : {{3}}. You can pick the package at your convenience.*/
-        
+
         const whatsappResponse = await whatsappService.sendWhatsAppTemplateMessage(booking.receiverPhone, this.booking_arrived, attributes, null);
         if (whatsappResponse.success) {
           logger.info('WhatsApp message sent successfully', {
@@ -548,41 +548,41 @@ class BookingService {
 
   static async deleteBooking(id, operatorId) {
     logger.info('Deleting booking', { bookingId: id, operatorId });
-    
+
     try {
       const booking = await Booking.findOneAndDelete({ _id: id, operatorId });
       if (!booking) {
         logger.warn('Booking not found for deletion', { bookingId: id, operatorId });
         throw new Error('Booking not found');
       }
-      
+
       logger.info('Successfully deleted booking', { bookingId: id, operatorId });
       return { message: 'Booking deleted' };
     } catch (error) {
-      logger.error('Error deleting booking', { 
-        error: error.message, 
-        bookingId: id, 
+      logger.error('Error deleting booking', {
+        error: error.message,
+        bookingId: id,
         operatorId,
-        stack: error.stack 
+        stack: error.stack
       });
       throw error;
     }
   }
-  
-  static async getUnassignedBookings(operatorId, page = 1, limit = 10, query = "", branchIds = []) {
-    logger.info('Fetching unassigned bookings', { 
-      operatorId, 
+
+  static async getUnassignedBookings(operatorId, page = 1, limit = 10, query = "", branchIds = [], status = "") {
+    logger.info('Fetching unassigned bookings', {
+      operatorId,
       branchIds,
-      page, 
-      limit, 
-      query: query || 'none' 
+      page,
+      limit,
+      query: query || 'none'
     });
-    
+
     try {
       const skip = (page - 1) * limit;
       const baseFilter = {
         operatorId,
-        status: { $in: ["Booked", "InTransit"] },
+        status: { $in: status ? [status] : ["Booked", "InTransit"] },
         ...(branchIds.length > 0 && { $or: branchIds.map(branchId => ({
           fromOffice: branchId
         })) })
@@ -643,12 +643,12 @@ class BookingService {
         count: bookings.length,
       };
 
-      logger.info('Successfully fetched unassigned bookings', { 
+      logger.info('Successfully fetched unassigned bookings', {
         total,
         returned: bookings.length,
         operatorId,
         page,
-        totalPages: result.totalPages 
+        totalPages: result.totalPages
       });
 
       return result;
@@ -666,13 +666,13 @@ class BookingService {
   }
 
   static async getAssignedBookings(operatorId, page = 1, limit = 10, query = "") {
-    logger.info('Fetching assigned bookings', { 
+    logger.info('Fetching assigned bookings', {
       operatorId,
-      page, 
-      limit, 
-      query: query || 'none' 
+      page,
+      limit,
+      query: query || 'none'
     });
-    
+
     try {
       const skip = (page - 1) * limit;
       const baseFilter = {
@@ -754,7 +754,7 @@ class BookingService {
     }
   }
 
-  static async getInTransitBookings(operatorId, userId, page = 1, limit = 10, query = "", branchIds = []) {
+  static async getInTransitBookings(operatorId, userId, page = 1, limit = 10, query = "", branchIds = [], status = "") {
     logger.info('Fetching in-transit bookings', {
       operatorId,
       branchIds,
@@ -767,7 +767,7 @@ class BookingService {
     try {
       const skip = (page - 1) * limit;
       const baseFilter = {
-        status: { $in: ['InTransit', 'Booked','Arrived'] },
+        status: { $in: status ? [status] : ['InTransit', 'Booked','Arrived'] },
         operatorId,
         ...(branchIds.length > 0 && { $or: branchIds.map(branchId => ({
           fromOffice: branchId
@@ -824,12 +824,12 @@ class BookingService {
         count: bookings.length,
       };
 
-      logger.info('Successfully fetched in-transit bookings', { 
+      logger.info('Successfully fetched in-transit bookings', {
         total,
         returned: bookings.length,
         operatorId,
         page,
-        totalPages: result.totalPages 
+        totalPages: result.totalPages
       });
 
       return result;
@@ -846,16 +846,16 @@ class BookingService {
     }
   }
 
-  static async getArrivedBookings(operatorId, userId, page = 1, limit = 10, query = "", branchIds = []) {
-    logger.info('Fetching arrived bookings', { 
+  static async getArrivedBookings(operatorId, userId, page = 1, limit = 10, query = "", branchIds = [], status = "") {
+    logger.info('Fetching arrived bookings', {
       operatorId,
       branchIds,
-      userId, 
-      page, 
-      limit, 
-      query: query || 'none' 
+      userId,
+      page,
+      limit,
+      query: query || 'none'
     });
-    
+
     try {
       const skip = (page - 1) * limit;
 
@@ -864,7 +864,7 @@ class BookingService {
         : operatorId;
 
       const baseFilter = {
-        status: { $in: ['Arrived', 'Booked'] },
+        status: { $in: status ? [status] : ['Arrived', 'Booked'] },
         operatorId: opId,
         ...(branchIds.length > 0 && { $or: branchIds.map(branchId => ({
           fromOffice: branchId
@@ -895,7 +895,7 @@ class BookingService {
         .populate('operatorId', '_id name')
         .populate('bookedBy', '_id fullName')
       ]);
-      
+
       logger.debug('Fetched arrived bookings', { total, limit, skip });
 
       const formattedBookings = rawBookings.map(b => {
@@ -926,12 +926,12 @@ class BookingService {
         count: formattedBookings.length,
       };
 
-      logger.info('Successfully fetched arrived bookings', { 
+      logger.info('Successfully fetched arrived bookings', {
         total,
         returned: formattedBookings.length,
         operatorId,
         page,
-        totalPages: result.totalPages 
+        totalPages: result.totalPages
       });
 
       return result;
@@ -949,14 +949,14 @@ class BookingService {
   }
 
   static async searchBookings({ operatorId, limit = 10, page = 1, query = "", status = "" }) {
-    logger.info('Searching bookings', { 
-      operatorId, 
-      query: query || 'none', 
+    logger.info('Searching bookings', {
+      operatorId,
+      query: query || 'none',
       status: status || 'all',
       page,
       limit
     });
-    
+
     try {
       const mongoQuery = { operatorId };
 
@@ -1009,20 +1009,20 @@ class BookingService {
         bookings: formattedBookings,
       };
 
-      logger.debug('Booking search completed', { 
+      logger.debug('Booking search completed', {
         totalResults: total,
         returnedResults: formattedBookings.length,
-        operatorId 
+        operatorId
       });
 
       return result;
     } catch (error) {
-      logger.error('Error searching bookings', { 
-        error: error.message, 
+      logger.error('Error searching bookings', {
+        error: error.message,
         operatorId,
         query,
         status,
-        stack: error.stack 
+        stack: error.stack
       });
       throw error;
     }
