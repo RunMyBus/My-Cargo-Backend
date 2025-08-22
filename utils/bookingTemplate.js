@@ -2,6 +2,9 @@ const Handlebars = require('handlebars');
 const Template = require('../models/Template');
 const puppeteer = require("puppeteer");
 const logger = require('../utils/logger');
+const fs = require('fs').promises;
+const Operator = require("../models/Operator");
+const path = require("path");
 
 // Register date formatting helper
 Handlebars.registerHelper('formatDate', function (date) {
@@ -21,17 +24,26 @@ Handlebars.registerHelper('default', function (value, fallback) {
   return value;
 });
 
-module.exports = async function generatePdfBuffer(booking, templateName = 'booking_receipt') {
+module.exports = async function generatePdfBuffer(booking) {
   logger.info('Generating PDF for booking', booking );
-  const templateDoc = await Template.findOne({ name: templateName });
-  if (!templateDoc) {
-    throw new Error(`Template '${templateName}' not found in DB`);
-  }
 
-  const compiledTemplate = Handlebars.compile(templateDoc.html);
-  const html = compiledTemplate(booking);
+    const operator = await Operator.findById(booking.operatorId).select('bookingTemplate').lean();
+    const templateName = operator?.bookingTemplate;
 
-  const browser = await puppeteer.launch({ headless: 'new' });
+    // 1. Get the template path using the operator's ID
+    const templatePath = path.join(__dirname, '..', 'templates', templateName);
+
+    // 2. Read the template file
+    const templateContent = await fs.readFile(templatePath, 'utf8');
+
+    // 3. Compile the template with the booking data
+    const compiledTemplate = Handlebars.compile(templateContent);
+    const html = compiledTemplate(booking);
+
+  const browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox'] // Added for better compatibility
+  });
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: 'networkidle0' });
 

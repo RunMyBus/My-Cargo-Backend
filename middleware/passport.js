@@ -65,7 +65,7 @@ const jwtLogin = new JwtStrategy(
     { ...opts },
     async (jwtPayload, done) => {
       try {
-        const user = await User.findOne({ _id: jwtPayload._id });
+        const user = await User.findOne({ _id: jwtPayload._id }).populate('role', 'rolename');
 
         if (!user) {
           return done(null, false, { message: 'User not found' });

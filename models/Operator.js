@@ -50,7 +50,12 @@ const operatorSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   createdAt: { type: Date, default: Date.now },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  updatedAt: { type: Date, default: Date.now }
+  updatedAt: { type: Date, default: Date.now },
+  bookingTemplate: { 
+    type: String, 
+    default: 'booking-confirmation-template.html',
+    description: 'Name of the HTML template file for bookings'
+  }
 });
 
 // Correct: Capitalized model name

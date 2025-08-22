@@ -242,8 +242,8 @@ class UserService {
    * @param {string} options.userRole - Current user's role name
    * @returns {Promise<Object>} Search results
    */
-  static async searchUsers({ query = "", page = 1, limit = 10, operatorId, userRole }) {
-    logger.info('Searching users', { query, page, limit, operatorId, userRole });
+  static async searchUsers({ query = "", page = 1, limit = 10, operatorId, operatorIdFromPayload, userRole }) {
+    logger.info('Searching users', { query, page, limit, operatorId, operatorIdFromPayload, userRole });
     
     const isSuperUser = userRole === 'Super User';
     
@@ -258,7 +258,7 @@ class UserService {
       const queryObj = query ? { fullName: regex } : {};
       
       // For Super User, don't filter by operatorId
-      const baseQuery = isSuperUser ? queryObj : { operatorId, ...queryObj };
+      const baseQuery = isSuperUser ? ( operatorIdFromPayload ? { operatorId: operatorIdFromPayload, ...queryObj } : queryObj ) : { operatorId, ...queryObj };
       
       const [total, users] = await Promise.all([
         User.countDocuments(baseQuery),
