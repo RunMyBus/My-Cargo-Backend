@@ -1120,7 +1120,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Whizzarddd\",\n    \"address\": \"Bangalore\",\n    \"phone\": \"0123456789\",\n    \"status\": \"Active\",\n    \"code\": \"WIZZZ\",\n    \"paymentOptions\": [\"cash\", \"UPI\"] \n}",
+							"raw": "{\n    \"name\": \"Whizzarddd\",\n    \"address\": \"Bangalore\",\n    \"phone\": \"0123456789\",\n    \"status\": \"Active\",\n    \"code\": \"WIZZZ\",\n    \"paymentOptions\": [\"Cash\", \"UPI\"] \n}",
 							"options": {
 								"raw": {
 									"language": "json"

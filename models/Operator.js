@@ -26,15 +26,15 @@ const operatorSchema = new mongoose.Schema({
   paymentOptions: {
     type: [{
       type: String,
-      enum: ['cash', 'UPI'],
+      enum: ['Cash', 'UPI'],
       required: true
     }],
-    default: ['cash'],
+    default: ['Cash'],
     validate: {
       validator: function(v) {
-        return v.length > 0 && v.every(option => ['cash', 'UPI'].includes(option));
+        return v.length > 0 && v.every(option => ['Cash', 'UPI'].includes(option));
       },
-      message: 'Payment options must include at least one valid option: cash or UPI'
+      message: 'Payment options must include at least one valid option: Cash or UPI'
     }
   },
   gstNumber: {
