@@ -26,6 +26,12 @@ class OperatorService {
       throw new Error('Operator with this name already exists');
     }
 
+      // Check if operator with same name exists
+      const existingTemplateName = await Operator.findOne({ name: operatorData.bookingTemplate });
+      if (existingTemplateName) {
+          throw new Error('Operator with this template name already exists');
+      }
+
     const operator = new Operator(operatorData);
     await operator.save();
     return operator;

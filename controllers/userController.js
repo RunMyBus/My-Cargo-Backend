@@ -114,6 +114,7 @@ exports.searchUsers = async (req, res) => {
   try {
     const { query = "", page = 1, limit = 10 } = req.body;
     const operatorId = req.user?.operatorId;
+    const operatorIdFromPayload = req.body.operatorId;
     
     // Get user's role information
     const userRole = req.user?.role?.rolename;
@@ -123,6 +124,7 @@ exports.searchUsers = async (req, res) => {
       page: Number(page),
       limit: Number(limit),
       operatorId,
+      operatorIdFromPayload,
       userRole,
       createdBy: userId
     });
