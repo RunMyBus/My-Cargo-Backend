@@ -27,7 +27,7 @@ describe('OperatorService.createOperator()', () => {
     code: 'wiz',
     address: 'Bangalore',
     phone: '0123456789',
-    paymentOptions: ['cash', 'UPI']
+    paymentOptions: ['Cash', 'UPI']
   };
 
   it('should create an operator and convert code to uppercase', async () => {
