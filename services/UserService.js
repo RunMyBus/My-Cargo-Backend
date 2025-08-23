@@ -255,7 +255,12 @@ class UserService {
     try {
       const regex = new RegExp(query, "i");
       const skip = (page - 1) * limit;
-      const queryObj = query ? { fullName: regex } : {};
+      const queryObj = query ? { 
+        $or: [
+          { fullName: regex },
+          { mobile: regex }
+        ]
+      } : {};
       
       // For Super User, don't filter by operatorId
       const baseQuery = isSuperUser ? ( operatorIdFromPayload ? { operatorId: operatorIdFromPayload, ...queryObj } : queryObj ) : { operatorId, ...queryObj };
